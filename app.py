@@ -2,15 +2,16 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from io import BytesIO
+from supabase import create_client, Client
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
-# Configuración inicial de la página
-st.set_page_config(page_title="Control de Producción - Crealag", layout="wide", page_icon="⚙️")
+# Configuración de la página con la identidad corporativa de Crealag
+st.set_page_config(page_title="crealag - Control de Producción y Remisiones", layout="wide", page_icon="🏢")
 
-# Estilos CSS corporativos (Paleta Crealag: Azul Noche y Bronce)
+# Estilos CSS con paleta Crealag (Azul Noche y Bronce)
 st.markdown("""
     <style>
     .stApp {
@@ -38,35 +39,92 @@ st.markdown("""
         color: #FACC15;
         box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
     }
-    button[data-baseweb="tab"] {
-        color: #94A3B8 !important;
-    }
-    button[aria-selected="true"] {
-        color: #D4AF37 !important;
-        border-bottom-color: #D4AF37 !important;
+    /* Estilo para los títulos de marca */
+    .brand-title {
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-weight: 800;
+        letter-spacing: -1px;
+        color: #F8FAFC;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Título principal de la aplicación
-st.title("⚙️ Crealag - Control de Producción y Remisiones")
+# Conexión a Supabase
+@st.cache_resource
+def init_supabase():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
 
-# Creación de Pestañas principales
-pestana_prod, pestana_rem = st.tabs(["📊 Producción y Registro", "📄 Generador de Remisiones"])
+try:
+    supabase = init_supabase()
+    db_status = True
+except Exception as e:
+    db_status = False
 
-with pestana_prod:
+# --- NAVEGACIÓN EN LA BARRA LATERAL (SUPERIOR IZQUIERDA) ---
+with st.sidebar:
+    st.markdown("<h2 class='brand-title' style='color: #D4AF37; margin-bottom: 0px;'>crealag</h2>", unsafe_allow_html=True)
+    st.caption("Fabricante mueblerio metalformado A.C. e INOX")
+    st.markdown("---")
+    
+    # Selector en lista desplegable en la parte superior izquierda
+    menu_seleccionado = st.selectbox(
+        "Navegación del Sistema",
+        ["📊 Producción y Registro", "📄 Generador de Remisiones"]
+    )
+
+# Título principal con branding integrado
+st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Control de Producción y Remisiones</span></h1>", unsafe_allow_html=True)
+st.markdown("---")
+
+# --- SECCIÓN 1: REGISTRO DE PRODUCCIÓN ---
+if menu_seleccionado == "📊 Producción y Registro":
     st.subheader("Panel de Control de Producción - Modelo Suiza")
-    st.write("Aquí puedes registrar la producción diaria y consultar los datos en tiempo real.")
-    # [Aquí va tu lógica previa de registro y conexión a Supabase]
-    st.info("Conexión con Supabase activa y operando correctamente.")
+    
+    if db_status:
+        st.success("Conexión con Supabase activa y operando correctamente.")
+    else:
+        st.warning("Verifica tus llaves de conexión a Supabase en la configuración de secrets.")
 
-with pestana_rem:
+    with st.form("form_produccion"):
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            fecha_prod = st.date_input("Fecha de Producción", datetime.now())
+            operador = st.text_input("Operador / Taller", "")
+            proceso = st.selectbox("Proceso", ["Corte", "Doblado", "Soldadura", "Pintura / Powder Coat", "Ensamble", "Empaque"])
+        with col_p2:
+            piezas_buenas = st.number_input("Piezas Fabricadas / Buenas", min_value=0, value=0, step=1)
+            piezas_mermadas = st.number_input("Piezas Mermadas / Scrappeadas", min_value=0, value=0, step=1)
+            observaciones_prod = st.text_area("Notas / Observaciones", "")
+
+        guardar_prod = st.form_submit_button("💾 Guardar Registro de Producción")
+
+    if guardar_prod:
+        if db_status:
+            try:
+                datos = {
+                    "fecha": fecha_prod.strftime("%Y-%m-%d"),
+                    "operador": operador,
+                    "proceso": proceso,
+                    "cantidad": piezas_buenas,
+                    "scraps": piezas_mermadas,
+                    "observaciones": observaciones_prod
+                }
+                respuesta = supabase.table("produccion").insert(datos).execute()
+                st.success("✅ ¡Registro de producción guardado con éxito en Supabase!")
+            except Exception as err:
+                st.error(f"Error al guardar los datos: {err}")
+        else:
+            st.error("No hay conexión a la base de datos.")
+
+# --- SECCIÓN 2: GENERADOR DE REMISIONES ---
+elif menu_seleccionado == "📄 Generador de Remisiones":
     st.subheader("Generador de Remisiones Oficiales")
     st.write("Rellena los datos para generar el documento oficial en PDF con el formato Crealag.")
 
     with st.form("form_remision"):
         col1, col2 = st.columns(2)
-        
         with col1:
             atencion = st.text_input("Atención (Contacto)", "Ing. Laura Zamora")
             compania = st.text_input("Compañía / Cliente", "Herwong")
@@ -89,7 +147,6 @@ with pestana_rem:
         submit_pdf = st.form_submit_button("Generar PDF de Remisión")
 
     if submit_pdf:
-        # Función para generar el PDF con ReportLab
         def generar_pdf():
             buffer = BytesIO()
             doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
@@ -98,7 +155,6 @@ with pestana_rem:
             styles = getSampleStyleSheet()
             style_normal = styles['Normal']
             
-            # Encabezado (Logo simulado / Texto corporativo)
             style_titulo = ParagraphStyle('TituloCrealag', parent=style_normal, fontName='Helvetica-Bold', fontSize=26, textColor=colors.HexColor('#0A0F1D'))
             style_sub = ParagraphStyle('SubCrealag', parent=style_normal, fontName='Helvetica', fontSize=10, textColor=colors.HexColor('#334155'))
             
@@ -106,7 +162,6 @@ with pestana_rem:
             story.append(Paragraph("Fabricante mueblerio metalformado A.C. e INOX", style_sub))
             story.append(Spacer(1, 15))
             
-            # Tabla de metadatos (Cliente y Referencias)
             data_meta = [
                 [Paragraph("<b>Atención:</b>", style_normal), Paragraph(atencion, style_normal), Paragraph("<b>Documento:</b>", style_normal), Paragraph(documento, style_normal)],
                 [Paragraph("<b>Compañía:</b>", style_normal), Paragraph(compania, style_normal), Paragraph("<b>Referencia cliente:</b>", style_normal), Paragraph(pedido_cliente, style_normal)],
@@ -123,12 +178,10 @@ with pestana_rem:
             story.append(t_meta)
             story.append(Spacer(1, 20))
             
-            # Cuerpo / Texto de entrega
             style_cuerpo = ParagraphStyle('CuerpoRem', parent=style_normal, fontName='Helvetica', fontSize=11, leading=16, textColor=colors.HexColor('#0F172A'))
             story.append(Paragraph(texto_pedido, style_cuerpo))
-            story.append(Spacer(1, 150)) # Espacio para las imágenes de referencia si se requiere
+            story.append(Spacer(1, 150))
             
-            # Tabla de Firmas
             data_firmas = [
                 [Paragraph("___________________________________", style_normal), Paragraph("___________________________________", style_normal)],
                 [Paragraph("<b>ENTREGA</b>", style_normal), Paragraph("<b>NOMBRE Y FIRMA RECIBE</b>", style_normal)]
