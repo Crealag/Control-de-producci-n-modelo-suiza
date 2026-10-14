@@ -423,4 +423,23 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
         with col2:
             referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
             fecha_remision = st.date_input("Fecha de emisión", datetime.now())
-            cantidad_piezas = st.number_input("Cantidad de piezas a entregar", min_value=1, value=max(1, int(pie
+            cantidad_piezas = st.number_input("Cantidad de piezas a entregar", min_value=1, value=max(1, int(piezas_producidas_total)))
+
+        fecha_recibido_str = st.text_input("Fecha de pedido recibido (Texto)", "08 de mayo de 2026")
+
+        submit_pdf = st.form_submit_button("Generar PDF de Remisión Original")
+
+    if submit_pdf:
+        pdf_buffer = generar_pdf_original(
+            atencion, compania, puesto, email, cel, 
+            referencia, oc_actual, fecha_remision, 
+            cantidad_piezas, fecha_recibido_str
+        )
+        
+        st.success("¡Remisión con formato original Crealag generada con éxito!")
+        st.download_button(
+            label="📥 Descargar Remisión en PDF",
+            data=pdf_buffer,
+            file_name="Remision.pdf",
+            mime="application/pdf"
+        )
