@@ -367,8 +367,8 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             story.append(t_campos)
             story.append(Spacer(1, 25))
             
-            # 3. TEXTO OFICIAL
-            texto_cuerpo = f"Referente a su pedido {oc_actual} recibido el {fecha_recibido_str}. Se hace entrega de {cantidad_piezas} piezas de respaldo de silla modelo Suiza."
+            # 3. TEXTO OFICIAL CON ORDEN DE COMPRA, FECHA Y CANTIDAD EN NEGRITAS Y SUBRAYADAS
+            texto_cuerpo = f"Referente a su pedido <b><u>{oc_actual}</u></b> recibido el <b><u>{fecha_recibido_str}</u></b>. Se hace entrega de <b><u>{cantidad_piezas}</u></b> piezas de respaldo de silla modelo Suiza."
             style_cuerpo = ParagraphStyle('CuerpoRemision', fontName='Helvetica', fontSize=10.5, leading=16, textColor=colors.HexColor('#0F172A'))
             story.append(Paragraph(texto_cuerpo, style_cuerpo))
             
@@ -421,20 +421,4 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             t_footer = Table([[col_contacto, col_direccion, col_folio]], colWidths=[180, 240, 100])
             t_footer.setStyle(TableStyle([
                 ('VALIGN', (0,0), (-1,-1), 'TOP'),
-                ('ALIGN', (2,0), (2,-1), 'RIGHT'),
-            ]))
-            story.append(t_footer)
-            
-            doc.build(story)
-            buffer.seek(0)
-            return buffer
-
-        pdf_buffer = generar_pdf_original()
-        
-        st.success("¡Remisión con formato original Crealag generada con éxito!")
-        st.download_button(
-            label="📥 Descargar Remisión en PDF",
-            data=pdf_buffer,
-            file_name="Remision.pdf",
-            mime="application/pdf"
-        )
+                ('ALIGN', (2,0), (2,-1),
