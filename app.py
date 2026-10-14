@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date
@@ -114,6 +115,125 @@ def insertar_registro(orden, fecha, hora, piezas, observaciones):
         return False
 
 df = cargar_datos_supabase()
+
+# --- FUNCIÓN GENERADORA DE PDF ---
+def generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_actual, fecha_remision, cantidad_piezas, fecha_recibido_str):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, 
+        pagesize=letter, 
+        rightMargin=36, 
+        leftMargin=36, 
+        topMargin=36, 
+        bottomMargin=15,
+        title="Remision",
+        author="Crealag"
+    )
+    story = []
+    
+    styles = getSampleStyleSheet()
+    style_normal = styles['Normal']
+    
+    # 1. ENCABEZADO CON LOGO Y LÍNEA OSCURA SUPERIOR
+    style_logo = ParagraphStyle('LogoCrealag', fontName='Helvetica-Bold', fontSize=28, textColor=colors.HexColor('#0A0F1D'), leading=30)
+    story.append(Paragraph("<b>crealag</b>", style_logo))
+    story.append(Spacer(1, 4))
+    
+    tabla_linea = Table([['']], colWidths=[540], rowHeights=[2.5])
+    tabla_linea.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#0A0F1D')),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ('TOPPADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(tabla_linea)
+    story.append(Spacer(1, 20))
+    
+    # 2. BLOQUE DE CAMPOS VERTICALES
+    style_label = ParagraphStyle('LabelEstilo', fontName='Helvetica-Bold', fontSize=10, textColor=colors.HexColor('#0F172A'))
+    style_val = ParagraphStyle('ValEstilo', fontName='Helvetica', fontSize=10, textColor=colors.HexColor('#0F172A'))
+    
+    data_campos = [
+        [Paragraph("<b>Atención:</b>", style_label), Paragraph(atencion, style_val)],
+        [Paragraph("<b>Compañía:</b>", style_label), Paragraph(compania, style_val)],
+        [Paragraph("<b>Puesto:</b>", style_label), Paragraph(puesto, style_val)],
+        [Paragraph("<b>Email:</b>", style_label), Paragraph(email, style_val)],
+        [Paragraph("<b>Cel:</b>", style_label), Paragraph(cel, style_val)],
+        [Paragraph("<b>Referencia:</b>", style_label), Paragraph(referencia, style_val)],
+        [Paragraph("<b>Documento:</b>", style_label), Paragraph("FTO:2026-REM-1", style_val)],
+        [Paragraph("<b>Referencia cliente:</b>", style_label), Paragraph(oc_actual, style_val)],
+        [Paragraph("<b>Fecha:</b>", style_label), Paragraph(fecha_remision.strftime('%d / %m / %Y'), style_val)]
+    ]
+    
+    t_campos = Table(data_campos, colWidths=[130, 380])
+    t_campos.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+    ]))
+    story.append(t_campos)
+    story.append(Spacer(1, 25))
+    
+    # 3. TEXTO OFICIAL CON ORDEN DE COMPRA, FECHA Y CANTIDAD EN NEGRITAS Y SUBRAYADAS
+    texto_cuerpo = f"Referente a su pedido <b><u>{oc_actual}</u></b> recibido el <b><u>{fecha_recibido_str}</u></b>. Se hace entrega de <b><u>{cantidad_piezas}</u></b> piezas de respaldo de silla modelo Suiza."
+    style_cuerpo = ParagraphStyle('CuerpoRemision', fontName='Helvetica', fontSize=10.5, leading=16, textColor=colors.HexColor('#0F172A'))
+    story.append(Paragraph(texto_cuerpo, style_cuerpo))
+    
+    # Espacio amplio para separar el texto de las firmas
+    story.append(Spacer(1, 260))
+    
+    # 5. LÍNEAS DE FIRMA CON TEXTO CENTRADO
+    style_firma_texto = ParagraphStyle('FirmaTexto', fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#0F172A'), alignment=1)
+    
+    data_firmas = [
+        [Paragraph("____________________________________________", style_normal), Paragraph("____________________________________________", style_normal)],
+        [Paragraph("ENTREGA", style_firma_texto), Paragraph("NOMBRE Y FIRMA RECIBE", style_firma_texto)]
+    ]
+    t_firmas = Table(data_firmas, colWidths=[270, 270])
+    t_firmas.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
+    ]))
+    story.append(t_firmas)
+    
+    # Espacio para empujar el pie de página exactamente al fondo de la hoja
+    story.append(Spacer(1, 75))
+    
+    # 6. PIE DE PÁGINA OFICIAL
+    story.append(tabla_linea)
+    story.append(Spacer(1, 6))
+    
+    style_foot_val = ParagraphStyle('FootVal', fontName='Helvetica', fontSize=7.5, textColor=colors.HexColor('#0F172A'), leading=9)
+    
+    col_contacto = [
+        Paragraph("<b>Contacto:</b> contacto@crealag.mx", style_foot_val),
+        Paragraph("<b>Web:</b> crealag.com", style_foot_val),
+        Paragraph("<b>Tel:</b> +52 871 185 5001", style_foot_val),
+    ]
+    
+    col_direccion = [
+        Paragraph("<b>Crealag SA de CV</b>", style_foot_val),
+        Paragraph("Perif. Gomez Lerdo KM12 No. 0", style_foot_val),
+        Paragraph("Periferico C.P.35150 CD Lerdo Durango", style_foot_val),
+    ]
+    
+    col_folio = [
+        Paragraph("", style_foot_val),
+        Paragraph("", style_foot_val),
+        Paragraph("FTO:2026-REM-1", style_foot_val),
+    ]
+    
+    t_footer = Table([[col_contacto, col_direccion, col_folio]], colWidths=[180, 240, 100])
+    t_footer.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('ALIGN', (2,0), (2,-1), 'RIGHT'),
+    ]))
+    story.append(t_footer)
+    
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
 
 # --- BARRA LATERAL ---
 with st.sidebar:
@@ -239,156 +359,3 @@ if menu_seleccionado == "📊 Producción y Registro":
         st.dataframe(df_oc.sort_values(by="id", ascending=False), use_container_width=True)
         csv_reporte_gen = df_oc.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Descargar Reporte Parcial (CSV)",
-            data=csv_reporte_gen,
-            file_name=f"Remision_Reporte_{oc_actual}.csv",
-            mime="text/csv"
-        )
-    else:
-        st.info("Aún no hay registros en esta Orden de Compra en la base de datos.")
-
-    st.markdown("---")
-
-    # GRÁFICAS
-    st.subheader("📈 Gráficas de Rendimiento")
-    col_g1, col_g2 = st.columns(2)
-
-    with col_g1:
-        st.markdown("##### 🕒 Ritmo por Hora (8:00 AM - 6:00 PM)")
-        hoy_str = datetime.now().strftime("%Y-%m-%d")
-        df_hoy = df[df["fecha"] == hoy_str] if not df.empty and "fecha" in df.columns else pd.DataFrame()
-
-        if not df_hoy.empty:
-            df_h = df_hoy.copy()
-            df_h['Hora_Int'] = pd.to_datetime(df_h['hora'], format='%H:%M:%S', errors='coerce').dt.hour
-            df_h = df_h[(df_h['Hora_Int'] >= 8) & (df_h['Hora_Int'] <= 18) & (df_h['Hora_Int'] != 13)]
-            
-            if not df_h.empty:
-                df_h['Rango_Hora'] = df_h['Hora_Int'].apply(lambda x: f"{x:02d}:00 - {x+1:02d}:00")
-                df_por_hora = df_h.groupby('Rango_Hora')['piezas_producidas'].sum()
-                horas_jornada = [f"{h:02d}:00 - {h+1:02d}:00" for h in [8,9,10,11,12,14,15,16,17]]
-                df_por_hora = df_por_hora.reindex(horas_jornada, fill_value=0)
-                st.bar_chart(df_por_hora)
-            else:
-                st.info("💡 Sin registros en horario laboral hoy (excluyendo hora de comida 1-2 PM).")
-        else:
-            st.info("💡 Sin registros para el día de hoy.")
-
-    with col_g2:
-        st.markdown(f"##### 📅 Producción Acumulada por Día (`{oc_actual}`)")
-        if not df_oc.empty:
-            df_dias = df_oc.copy()
-            df_por_dia = df_dias.groupby('fecha')['piezas_producidas'].sum()
-            st.line_chart(df_por_dia)
-        else:
-            st.info("💡 Sin registros diarios en esta OC.")
-
-# --- SECCIÓN 2: GENERADOR DE REMISIONES ---
-elif menu_seleccionado == "📄 Generador de Remisiones":
-    st.subheader("Generador de Remisiones Oficiales - Formato Original Crealag")
-    
-    df_oc_rem = df[df["orden_compra"] == oc_actual] if not df.empty and "orden_compra" in df.columns else pd.DataFrame()
-    piezas_producidas_total = df_oc_rem["piezas_producidas"].sum() if not df_oc_rem.empty else 0
-    
-    st.info(f"📦 **Estado de Almacén para `{oc_actual}`:** Total Producido en Nube: **{piezas_producidas_total} piezas**.")
-
-    with st.form("form_remision"):
-        col1, col2 = st.columns(2)
-        with col1:
-            atencion = st.text_input("Atención", "Ing. Laura Zamora")
-            compania = st.text_input("Compañía", "Herwong")
-            puesto = st.text_input("Puesto", "Compras")
-            email = st.text_input("Email", "compras.herwong@gmail.com")
-            cel = st.text_input("Cel", "871-1442234")
-            
-        with col2:
-            referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
-            fecha_remision = st.date_input("Fecha de emisión", datetime.now())
-            cantidad_piezas = st.number_input("Cantidad de piezas a entregar", min_value=1, value=max(1, int(piezas_producidas_total)))
-
-        fecha_recibido_str = st.text_input("Fecha de pedido recibido (Texto)", "08 de mayo de 2026")
-
-        submit_pdf = st.form_submit_button("Generar PDF de Remisión Original")
-
-    if submit_pdf:
-        def generar_pdf_original():
-            buffer = BytesIO()
-            doc = SimpleDocTemplate(
-                buffer, 
-                pagesize=letter, 
-                rightMargin=36, 
-                leftMargin=36, 
-                topMargin=36, 
-                bottomMargin=15,
-                title="Remision",
-                author="Crealag"
-            )
-            story = []
-            
-            styles = getSampleStyleSheet()
-            style_normal = styles['Normal']
-            
-            # 1. ENCABEZADO CON LOGO Y LÍNEA OSCURA SUPERIOR
-            style_logo = ParagraphStyle('LogoCrealag', fontName='Helvetica-Bold', fontSize=28, textColor=colors.HexColor('#0A0F1D'), leading=30)
-            story.append(Paragraph("<b>crealag</b>", style_logo))
-            story.append(Spacer(1, 4))
-            
-            tabla_linea = Table([['']], colWidths=[540], rowHeights=[2.5])
-            tabla_linea.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#0A0F1D')),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 0),
-                ('TOPPADDING', (0,0), (-1,-1), 0),
-            ]))
-            story.append(tabla_linea)
-            story.append(Spacer(1, 20))
-            
-            # 2. BLOQUE DE CAMPOS VERTICALES
-            style_label = ParagraphStyle('LabelEstilo', fontName='Helvetica-Bold', fontSize=10, textColor=colors.HexColor('#0F172A'))
-            style_val = ParagraphStyle('ValEstilo', fontName='Helvetica', fontSize=10, textColor=colors.HexColor('#0F172A'))
-            
-            data_campos = [
-                [Paragraph("<b>Atención:</b>", style_label), Paragraph(atencion, style_val)],
-                [Paragraph("<b>Compañía:</b>", style_label), Paragraph(compania, style_val)],
-                [Paragraph("<b>Puesto:</b>", style_label), Paragraph(puesto, style_val)],
-                [Paragraph("<b>Email:</b>", style_label), Paragraph(email, style_val)],
-                [Paragraph("<b>Cel:</b>", style_label), Paragraph(cel, style_val)],
-                [Paragraph("<b>Referencia:</b>", style_label), Paragraph(referencia, style_val)],
-                [Paragraph("<b>Documento:</b>", style_label), Paragraph("FTO:2026-REM-1", style_val)],
-                [Paragraph("<b>Referencia cliente:</b>", style_label), Paragraph(oc_actual, style_val)],
-                [Paragraph("<b>Fecha:</b>", style_label), Paragraph(fecha_remision.strftime('%d / %m / %Y'), style_val)]
-            ]
-            
-            t_campos = Table(data_campos, colWidths=[130, 380])
-            t_campos.setStyle(TableStyle([
-                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 3),
-                ('TOPPADDING', (0,0), (-1,-1), 3),
-            ]))
-            story.append(t_campos)
-            story.append(Spacer(1, 25))
-            
-            # 3. TEXTO OFICIAL CON ORDEN DE COMPRA, FECHA Y CANTIDAD EN NEGRITAS Y SUBRAYADAS
-            texto_cuerpo = f"Referente a su pedido <b><u>{oc_actual}</u></b> recibido el <b><u>{fecha_recibido_str}</u></b>. Se hace entrega de <b><u>{cantidad_piezas}</u></b> piezas de respaldo de silla modelo Suiza."
-            style_cuerpo = ParagraphStyle('CuerpoRemision', fontName='Helvetica', fontSize=10.5, leading=16, textColor=colors.HexColor('#0F172A'))
-            story.append(Paragraph(texto_cuerpo, style_cuerpo))
-            
-            # Espacio amplio para separar el texto de las firmas
-            story.append(Spacer(1, 260))
-            
-            # 5. LÍNEAS DE FIRMA CON TEXTO CENTRADO
-            style_firma_texto = ParagraphStyle('FirmaTexto', fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#0F172A'), alignment=1)
-            
-            data_firmas = [
-                [Paragraph("____________________________________________", style_normal), Paragraph("____________________________________________", style_normal)],
-                [Paragraph("ENTREGA", style_firma_texto), Paragraph("NOMBRE Y FIRMA RECIBE", style_firma_texto)]
-            ]
-            t_firmas = Table(data_firmas, colWidths=[270, 270])
-            t_firmas.setStyle(TableStyle([
-                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                ('VALIGN', (0,0), (-1,-1), 'TOP'),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 2),
-                ('TOPPADDING', (0,0), (-1,-1), 2),
-            ]))
-            story.append(t_firmas)
-            
-            # Espacio para empujar el pie de página exactamente al
