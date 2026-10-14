@@ -5,7 +5,7 @@ from io import BytesIO
 import os
 from supabase import create_client
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
@@ -313,13 +313,16 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
     if submit_pdf:
         def generar_pdf_original():
             buffer = BytesIO()
+            # Se asignan metadatos explícitos: title="Remisión" y author="Crealag"
             doc = SimpleDocTemplate(
                 buffer, 
                 pagesize=letter, 
                 rightMargin=36, 
                 leftMargin=36, 
                 topMargin=36, 
-                bottomMargin=36
+                bottomMargin=15,
+                title="Remision",
+                author="Crealag"
             )
             story = []
             
@@ -363,39 +366,15 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
                 ('TOPPADDING', (0,0), (-1,-1), 3),
             ]))
             story.append(t_campos)
-            story.append(Spacer(1, 20))
+            story.append(Spacer(1, 25))
             
             # 3. TEXTO OFICIAL
-            texto_cuerpo = f"Referente a su pedido {oc_actual} recibido el {fecha_recibido_str}. Se hace entrega de {cantidad_piezas} piezas de respaldo de silla modelo Suiza (Orden de Compra: {oc_actual})."
+            texto_cuerpo = f"Referente a su pedido {oc_actual} recibido el {fecha_recibido_str}. Se hace entrega de {cantidad_piezas} piezas de respaldo de silla modelo Suiza."
             style_cuerpo = ParagraphStyle('CuerpoRemision', fontName='Helvetica', fontSize=10.5, leading=16, textColor=colors.HexColor('#0F172A'))
             story.append(Paragraph(texto_cuerpo, style_cuerpo))
-            story.append(Spacer(1, 15))
             
-            # 4. CARGA DE IMÁGENES
-            cad_img_obj = None
-            silla_img_obj = None
-            
-            for ruta_cad in ["cad_respaldo.png", "cad_respaldo.jpg", "./cad_respaldo.png", "./cad_respaldo.jpg"]:
-                if os.path.exists(ruta_cad):
-                    cad_img_obj = RLImage(ruta_cad, width=170, height=140)
-                    break
-
-            for ruta_silla in ["silla_terminada.png", "silla_terminada.jpg", "./silla_terminada.png", "./silla_terminada.jpg"]:
-                if os.path.exists(ruta_silla):
-                    silla_img_obj = RLImage(ruta_silla, width=140, height=170)
-                    break
-
-            if cad_img_obj or silla_img_obj:
-                img_data = [[cad_img_obj if cad_img_obj else "", silla_img_obj if silla_img_obj else ""]]
-                t_imgs = Table(img_data, colWidths=[270, 270])
-                t_imgs.setStyle(TableStyle([
-                    ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                    ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-                ]))
-                story.append(t_imgs)
-                story.append(Spacer(1, 20))
-            else:
-                story.append(Spacer(1, 60))
+            # Espacio amplio para separar el texto de las firmas
+            story.append(Spacer(1, 260))
             
             # 5. LÍNEAS DE FIRMA CON TEXTO CENTRADO
             style_firma_texto = ParagraphStyle('FirmaTexto', fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#0F172A'), alignment=1)
@@ -412,11 +391,13 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
                 ('TOPPADDING', (0,0), (-1,-1), 2),
             ]))
             story.append(t_firmas)
-            story.append(Spacer(1, 20))
+            
+            # Espacio para empujar el pie de página exactamente al fondo de la hoja
+            story.append(Spacer(1, 75))
             
             # 6. PIE DE PÁGINA OFICIAL
             story.append(tabla_linea)
-            story.append(Spacer(1, 8))
+            story.append(Spacer(1, 6))
             
             style_foot_val = ParagraphStyle('FootVal', fontName='Helvetica', fontSize=7.5, textColor=colors.HexColor('#0F172A'), leading=9)
             
@@ -449,12 +430,4 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             buffer.seek(0)
             return buffer
 
-        pdf_buffer = generar_pdf_original()
-        
-        st.success("¡Remisión con formato original Crealag generada con éxito!")
-        st.download_button(
-            label="📥 Descargar Remisión en PDF",
-            data=pdf_buffer,
-            file_name="Remision.pdf",
-            mime="application/pdf"
-        )
+        pdf_buffer = generar
