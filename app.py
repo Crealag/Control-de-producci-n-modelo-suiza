@@ -313,7 +313,6 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
     if submit_pdf:
         def generar_pdf_original():
             buffer = BytesIO()
-            # Se asignan metadatos explícitos: title="Remisión" y author="Crealag"
             doc = SimpleDocTemplate(
                 buffer, 
                 pagesize=letter, 
@@ -430,4 +429,12 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             buffer.seek(0)
             return buffer
 
-        pdf_buffer = generar
+        pdf_buffer = generar_pdf_original()
+        
+        st.success("¡Remisión con formato original Crealag generada con éxito!")
+        st.download_button(
+            label="📥 Descargar Remisión en PDF",
+            data=pdf_buffer,
+            file_name="Remision.pdf",
+            mime="application/pdf"
+        )
