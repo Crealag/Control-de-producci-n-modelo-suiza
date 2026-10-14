@@ -165,4 +165,288 @@ if menu_seleccionado == "📊 Producción y Registro":
 
     st.progress(porcentaje)
 
-    if piezas_producidas_oc >= meta_actual and meta
+    if piezas_producidas_oc >= meta_actual and meta_actual > 0:
+        st.success(f"📌 **PRODUCCIÓN CUMPLIDA:** Se alcanzó la meta de **{piezas_producidas_oc}** piezas para la `{oc_actual}`.")
+        csv_reporte = df_oc.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Descargar Reporte Final (CSV)",
+            data=csv_reporte,
+            file_name=f"Reporte_Produccion_{oc_actual}.csv",
+            mime="text/csv",
+            type="primary"
+        )
+
+    st.markdown("---")
+
+    # CAPTURA
+    st.subheader("➕ Registrar Piezas")
+    tipo_captura = st.radio("Modo de registro:", ["Rápido / Actual", "Pasado (Fecha/Hora)"], horizontal=True)
+
+    piezas_sumar = 0
+    fecha_registro = datetime.now().strftime("%Y-%m-%d")
+    hora_registro = datetime.now().strftime("%H:%M:%S")
+
+    if tipo_captura == "Rápido / Actual":
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            st.markdown("**Botones rápidos**")
+            b1, b2, b3 = st.columns(3)
+            if b1.button("+10"): piezas_sumar = 10
+            if b2.button("+50"): piezas_sumar = 50
+            if b3.button("+100"): piezas_sumar = 100
+
+        with col2:
+            st.markdown("**Ingreso manual**")
+            cantidad_manual = st.number_input("Cantidad:", min_value=0, value=0, step=1, key="manual_actual")
+            if st.button("Guardar", type="primary"):
+                if cantidad_manual > 0:
+                    piezas_sumar = cantidad_manual
+                else:
+                    st.warning("Ingresa un valor mayor a 0.")
+    else:
+        st.markdown("**Registro con Fecha y Hora Personalizada**")
+        f_pasada = st.date_input("Fecha:", value=date.today())
+        h_pasada = st.time_input("Hora:", value=datetime.now().time())
+        cantidad_pasada = st.number_input("Cantidad de piezas:", min_value=1, value=10, step=1, key="manual_pasada")
+        
+        fecha_registro = f_pasada.strftime("%Y-%m-%d")
+        hora_registro = h_pasada.strftime("%H:%M:%S")
+        
+        if st.button("Guardar Registro Pasado", type="primary"):
+            piezas_sumar = cantidad_pasada
+
+    observaciones_turno = st.text_input("Observaciones del Turno:", placeholder="Ej. Ajuste en prensa...")
+
+    if piezas_sumar > 0:
+        exito = insertar_registro(oc_actual, fecha_registro, hora_registro, piezas_sumar, observaciones_turno if observaciones_turno else "Sin observaciones")
+        if exito:
+            st.success(f"✅ ¡Registradas {piezas_sumar} piezas en Supabase!")
+            st.rerun()
+
+    st.markdown("---")
+
+    # HISTORIAL
+    st.subheader(f"📋 Historial en Nube - {oc_actual}")
+    if not df_oc.empty:
+        st.dataframe(df_oc.sort_values(by="id", ascending=False), use_container_width=True)
+        csv_reporte_gen = df_oc.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Descargar Reporte Parcial",
+            data=csv_reporte_gen,
+            file_name=f"Reporte_Parcial_{oc_actual}.csv",
+            mime="text/csv"
+        )
+    else:
+        st.info("Aún no hay registros en esta Orden de Compra en la base de datos.")
+
+    st.markdown("---")
+
+    # GRÁFICAS
+    st.subheader("📈 Gráficas de Rendimiento")
+    col_g1, col_g2 = st.columns(2)
+
+    with col_g1:
+        st.markdown("##### 🕒 Ritmo por Hora (8:00 AM - 6:00 PM)")
+        hoy_str = datetime.now().strftime("%Y-%m-%d")
+        df_hoy = df[df["fecha"] == hoy_str] if not df.empty and "fecha" in df.columns else pd.DataFrame()
+
+        if not df_hoy.empty:
+            df_h = df_hoy.copy()
+            df_h['Hora_Int'] = pd.to_datetime(df_h['hora'], format='%H:%M:%S', errors='coerce').dt.hour
+            df_h = df_h[(df_h['Hora_Int'] >= 8) & (df_h['Hora_Int'] <= 18) & (df_h['Hora_Int'] != 13)]
+            
+            if not df_h.empty:
+                df_h['Rango_Hora'] = df_h['Hora_Int'].apply(lambda x: f"{x:02d}:00 - {x+1:02d}:00")
+                df_por_hora = df_h.groupby('Rango_Hora')['piezas_producidas'].sum()
+                horas_jornada = [f"{h:02d}:00 - {h+1:02d}:00" for h in [8,9,10,11,12,14,15,16,17]]
+                df_por_hora = df_por_hora.reindex(horas_jornada, fill_value=0)
+                st.bar_chart(df_por_hora)
+            else:
+                st.info("💡 Sin registros en horario laboral hoy (excluyendo hora de comida 1-2 PM).")
+        else:
+            st.info("💡 Sin registros para el día de hoy.")
+
+    with col_g2:
+        st.markdown(f"##### 📅 Producción Acumulada por Día (`{oc_actual}`)")
+        if not df_oc.empty:
+            df_dias = df_oc.copy()
+            df_por_dia = df_dias.groupby('fecha')['piezas_producidas'].sum()
+            st.line_chart(df_por_dia)
+        else:
+            st.info("💡 Sin registros diarios en esta OC.")
+
+# --- SECCIÓN 2: GENERADOR DE REMISIONES (FORMATO ORIGINAL CREALAG CON IMÁGENES AUTOMÁTICAS) ---
+elif menu_seleccionado == "📄 Generador de Remisiones":
+    st.subheader("Generador de Remisiones Oficiales - Formato Original Crealag")
+    
+    df_oc_rem = df[df["orden_compra"] == oc_actual] if not df.empty and "orden_compra" in df.columns else pd.DataFrame()
+    piezas_producidas_total = df_oc_rem["piezas_producidas"].sum() if not df_oc_rem.empty else 0
+    
+    st.info(f"📦 **Estado de Almacén para `{oc_actual}`:** Total Producido en Nube: **{piezas_producidas_total} piezas**.")
+
+    with st.form("form_remision"):
+        col1, col2 = st.columns(2)
+        with col1:
+            atencion = st.text_input("Atención", "Ing. Laura Zamora")
+            compania = st.text_input("Compañía", "Herwong")
+            puesto = st.text_input("Puesto", "Compras")
+            email = st.text_input("Email", "compras.herwong@gmail.com")
+            cel = st.text_input("Cel", "871-1442234")
+            
+        with col2:
+            referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
+            documento = st.text_input("Documento", f"HER-080526-REM")
+            referencia_cliente = st.text_input("Referencia cliente", "Pedido No. 01")
+            fecha_remision = st.date_input("Fecha de emisión", datetime.now())
+            cantidad_piezas = st.number_input("Cantidad de piezas a entregar", min_value=1, value=max(1, int(piezas_producidas_total)))
+
+        fecha_recibido_str = st.text_input("Fecha de pedido recibido (Texto)", "08 de mayo de 2026")
+
+        submit_pdf = st.form_submit_button("Generar PDF de Remisión Original")
+
+    if submit_pdf:
+        def generar_pdf_original():
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(
+                buffer, 
+                pagesize=letter, 
+                rightMargin=36, 
+                leftMargin=36, 
+                topMargin=36, 
+                bottomMargin=36
+            )
+            story = []
+            
+            styles = getSampleStyleSheet()
+            style_normal = styles['Normal']
+            
+            # 1. ENCABEZADO CON LOGO Y LÍNEA OSCURA SUPERIOR
+            style_logo = ParagraphStyle('LogoCrealag', fontName='Helvetica-Bold', fontSize=28, textColor=colors.HexColor('#0A0F1D'), leading=30)
+            story.append(Paragraph("<b>crealag</b>", style_logo))
+            story.append(Spacer(1, 4))
+            
+            # Línea horizontal oscura superior
+            tabla_linea = Table([['']], colWidths=[540], rowHeights=[2.5])
+            tabla_linea.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#0A0F1D')),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+                ('TOPPADDING', (0,0), (-1,-1), 0),
+            ]))
+            story.append(tabla_linea)
+            story.append(Spacer(1, 20))
+            
+            # 2. BLOQUE DE CAMPOS VERTICALES
+            style_label = ParagraphStyle('LabelEstilo', fontName='Helvetica-Bold', fontSize=10, textColor=colors.HexColor('#0F172A'))
+            style_val = ParagraphStyle('ValEstilo', fontName='Helvetica', fontSize=10, textColor=colors.HexColor('#0F172A'))
+            
+            data_campos = [
+                [Paragraph("<b>Atención:</b>", style_label), Paragraph(atencion, style_val)],
+                [Paragraph("<b>Compañía:</b>", style_label), Paragraph(compania, style_val)],
+                [Paragraph("<b>Puesto:</b>", style_label), Paragraph(puesto, style_val)],
+                [Paragraph("<b>Email:</b>", style_label), Paragraph(email, style_val)],
+                [Paragraph("<b>Cel:</b>", style_label), Paragraph(cel, style_val)],
+                [Paragraph("<b>Referencia:</b>", style_label), Paragraph(f"{referencia}", style_val)],
+                [Paragraph("<b>Documento:</b>", style_label), Paragraph(documento, style_val)],
+                [Paragraph("<b>Referencia cliente:</b>", style_label), Paragraph(referencia_cliente, style_val)],
+                [Paragraph("<b>Fecha:</b>", style_label), Paragraph(fecha_remision.strftime('%d / %m / %Y'), style_val)],
+            ]
+            
+            t_campos = Table(data_campos, colWidths=[130, 380])
+            t_campos.setStyle(TableStyle([
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+                ('TOPPADDING', (0,0), (-1,-1), 3),
+            ]))
+            story.append(t_campos)
+            story.append(Spacer(1, 25))
+            
+            # 3. TEXTO OFICIAL DE LA REMISIÓN
+            texto_cuerpo = f"Referente a su pedido {referencia_cliente} recibido el {fecha_recibido_str}. Se hace entrega de {cantidad_piezas} piezas de respaldo de silla modelo Suiza (Orden de Compra: {oc_actual})."
+            style_cuerpo = ParagraphStyle('CuerpoRemision', fontName='Helvetica', fontSize=10.5, leading=16, textColor=colors.HexColor('#0F172A'))
+            story.append(Paragraph(texto_cuerpo, style_cuerpo))
+            story.append(Spacer(1, 20))
+            
+            # 4. CARGA AUTOMÁTICA DE IMÁGENES GUARDADAS EN EL REPOSITORIO
+            cad_img_obj = None
+            silla_img_obj = None
+            
+            if os.path.exists("cad_respaldo.png"):
+                cad_img_obj = RLImage("cad_respaldo.png", width=180, height=150)
+            elif os.path.exists("cad_respaldo.jpg"):
+                cad_img_obj = RLImage("cad_respaldo.jpg", width=180, height=150)
+
+            if os.path.exists("silla_terminada.png"):
+                silla_img_obj = RLImage("silla_terminada.png", width=150, height=180)
+            elif os.path.exists("silla_terminada.jpg"):
+                silla_img_obj = RLImage("silla_terminada.jpg", width=150, height=180)
+
+            if cad_img_obj or silla_img_obj:
+                img_data = [[cad_img_obj if cad_img_obj else "", silla_img_obj if silla_img_obj else ""]]
+                t_imgs = Table(img_data, colWidths=[260, 260])
+                t_imgs.setStyle(TableStyle([
+                    ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                    ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ]))
+                story.append(t_imgs)
+                story.append(Spacer(1, 30))
+            else:
+                story.append(Spacer(1, 100))
+            
+            # 5. LÍNEAS DE FIRMA
+            data_firmas = [
+                [Paragraph("___________________________________", style_normal), Paragraph("___________________________________", style_normal)],
+                [Paragraph("<b>ENTREGA</b>", style_normal), Paragraph("<b>NOMBRE Y FIRMA RECIBE</b>", style_normal)]
+            ]
+            t_firmas = Table(data_firmas, colWidths=[260, 260])
+            t_firmas.setStyle(TableStyle([
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ]))
+            story.append(t_firmas)
+            story.append(Spacer(1, 25))
+            
+            # 6. PIE DE PÁGINA CON LÍNEA INFERIOR Y DATOS OFICIALES
+            story.append(tabla_linea) # Línea oscura inferior
+            story.append(Spacer(1, 8))
+            
+            style_foot_val = ParagraphStyle('FootVal', fontName='Helvetica', fontSize=7.5, textColor=colors.HexColor('#0F172A'), leading=9)
+            
+            col_contacto = [
+                Paragraph("<b>Contacto:</b> contacto@crealag.mx", style_foot_val),
+                Paragraph("<b>Web:</b> crealag.com", style_foot_val),
+                Paragraph("<b>Tel:</b> +52 871 185 5001", style_foot_val),
+            ]
+            
+            col_direccion = [
+                Paragraph("<b>Crealag SA de CV</b>", style_foot_val),
+                Paragraph("Perif. Gomez Lerdo KM12 No. 0", style_foot_val),
+                Paragraph("Periferico C.P.35150 CD Lerdo Durango", style_foot_val),
+            ]
+            
+            col_folio = [
+                Paragraph("", style_foot_val),
+                Paragraph("", style_foot_val),
+                Paragraph("FTO:2026-REM-1", style_foot_val),
+            ]
+            
+            t_footer = Table([[col_contacto, col_direccion, col_folio]], colWidths=[180, 240, 100])
+            t_footer.setStyle(TableStyle([
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('ALIGN', (2,0), (2,-1), 'RIGHT'),
+            ]))
+            story.append(t_footer)
+            
+            doc.build(story)
+            buffer.seek(0)
+            return buffer
+
+        pdf_buffer = generar_pdf_original()
+        
+        st.success("¡Remisión con formato original Crealag generada con éxito!")
+        st.download_button(
+            label="📥 Descargar Remisión en PDF",
+            data=pdf_buffer,
+            file_name=f"{documento}.pdf",
+            mime="application/pdf"
+        )
