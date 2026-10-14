@@ -39,7 +39,6 @@ st.markdown("""
         color: #FACC15;
         box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
     }
-    /* Estilo para los títulos de marca */
     .brand-title {
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
         font-weight: 800;
@@ -68,7 +67,6 @@ with st.sidebar:
     st.caption("Fabricante mueblerio metalformado A.C. e INOX")
     st.markdown("---")
     
-    # Selector en lista desplegable en la parte superior izquierda
     menu_seleccionado = st.selectbox(
         "Navegación del Sistema",
         ["📊 Producción y Registro", "📄 Generador de Remisiones"]
@@ -78,7 +76,7 @@ with st.sidebar:
 st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Control de Producción y Remisiones</span></h1>", unsafe_allow_html=True)
 st.markdown("---")
 
-# --- SECCIÓN 1: REGISTRO DE PRODUCCIÓN ---
+# --- SECCIÓN 1: REGISTRO DE PRODUCCIÓN (Mapeado a la tabla "Producción") ---
 if menu_seleccionado == "📊 Producción y Registro":
     st.subheader("Panel de Control de Producción - Modelo Suiza")
     
@@ -90,28 +88,28 @@ if menu_seleccionado == "📊 Producción y Registro":
     with st.form("form_produccion"):
         col_p1, col_p2 = st.columns(2)
         with col_p1:
+            orden_compra = st.text_input("Orden de Compra", "HER-080526")
             fecha_prod = st.date_input("Fecha de Producción", datetime.now())
-            operador = st.text_input("Operador / Taller", "")
-            proceso = st.selectbox("Proceso", ["Corte", "Doblado", "Soldadura", "Pintura / Powder Coat", "Ensamble", "Empaque"])
         with col_p2:
-            piezas_buenas = st.number_input("Piezas Fabricadas / Buenas", min_value=0, value=0, step=1)
-            piezas_mermadas = st.number_input("Piezas Mermadas / Scrappeadas", min_value=0, value=0, step=1)
-            observaciones_prod = st.text_area("Notas / Observaciones", "")
+            hora_prod = st.text_input("Hora", datetime.now().strftime("%H:%M"))
+            piezas_producidas = st.number_input("Piezas Producidas", min_value=0, value=0, step=1)
+            
+        observaciones_turno = st.text_area("Observaciones del Turno", "")
 
-        guardar_prod = st.form_submit_button("💾 Guardar Registro de Producción")
+        guardar_prod = st.form_submit_button("💾 Guardar Registro en Supabase")
 
     if guardar_prod:
         if db_status:
             try:
                 datos = {
+                    "orden_compra": orden_compra,
                     "fecha": fecha_prod.strftime("%Y-%m-%d"),
-                    "operador": operador,
-                    "proceso": proceso,
-                    "cantidad": piezas_buenas,
-                    "scraps": piezas_mermadas,
-                    "observaciones": observaciones_prod
+                    "hora": hora_prod,
+                    "piezas_producidas": int(piezas_producidas),
+                    "observaciones_turno": observaciones_turno
                 }
-                respuesta = supabase.table("produccion").insert(datos).execute()
+                # Inserta los datos directamente en tu tabla "Producción"
+                respuesta = supabase.table("Producción").insert(datos).execute()
                 st.success("✅ ¡Registro de producción guardado con éxito en Supabase!")
             except Exception as err:
                 st.error(f"Error al guardar los datos: {err}")
@@ -127,22 +125,19 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
         col1, col2 = st.columns(2)
         with col1:
             atencion = st.text_input("Atención (Contacto)", "Ing. Laura Zamora")
-            compania = st.text_input("Compañía / Cliente", "Herwong")
+            compania = st.text_input("Compañía", "Herwong")
             puesto = st.text_input("Puesto", "Compras")
             email = st.text_input("Email", "compras.herwong@gmail.com")
-            cel = st.text_input("Celular", "871-1442234")
+            cel = st.text_input("Cel", "871-1442234")
             
         with col2:
-            referencia = st.text_input("Referencia del Producto", "Respaldos sillas modelo Suiza")
-            documento = st.text_input("Folio Documento", "HER-080526-REM")
-            pedido_cliente = st.text_input("Referencia Cliente (Pedido)", "Pedido No. 01")
-            fecha_remision = st.date_input("Fecha de Emisión", datetime.now())
-            cantidad_piezas = st.number_input("Cantidad de Piezas", min_value=1, value=15)
+            referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
+            documento = st.text_input("Documento (Folio)", "HER-080526-REM")
+            referencia_cliente = st.text_input("Referencia cliente", "Pedido No. 01")
+            fecha_remision = st.date_input("Fecha", datetime.now())
+            cantidad_piezas = st.number_input("Cantidad de piezas", min_value=1, value=15)
 
-        texto_pedido = st.text_area(
-            "Texto Descriptivo del Pedido",
-            f"Referente a su pedido recibido el {fecha_remision.strftime('%d/%m/%Y')}. Se hace entrega de {cantidad_piezas} piezas de respaldo de silla modelo Suiza."
-        )
+        fecha_recibido_str = st.text_input("Fecha en que se recibió el pedido (Texto)", "08 de mayo de 2026")
 
         submit_pdf = st.form_submit_button("Generar PDF de Remisión")
 
@@ -155,8 +150,8 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             styles = getSampleStyleSheet()
             style_normal = styles['Normal']
             
-            style_titulo = ParagraphStyle('TituloCrealag', parent=style_normal, fontName='Helvetica-Bold', fontSize=26, textColor=colors.HexColor('#0A0F1D'))
-            style_sub = ParagraphStyle('SubCrealag', parent=style_normal, fontName='Helvetica', fontSize=10, textColor=colors.HexColor('#334155'))
+            style_titulo = ParagraphStyle('TituloCrealag', parent=style_normal, fontName='Helvetica-Bold', fontSize=24, textColor=colors.HexColor('#0A0F1D'))
+            style_sub = ParagraphStyle('SubCrealag', parent=style_normal, fontName='Helvetica', fontSize=9, textColor=colors.HexColor('#334155'))
             
             story.append(Paragraph("<b>crealag</b>", style_titulo))
             story.append(Paragraph("Fabricante mueblerio metalformado A.C. e INOX", style_sub))
@@ -164,23 +159,25 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             
             data_meta = [
                 [Paragraph("<b>Atención:</b>", style_normal), Paragraph(atencion, style_normal), Paragraph("<b>Documento:</b>", style_normal), Paragraph(documento, style_normal)],
-                [Paragraph("<b>Compañía:</b>", style_normal), Paragraph(compania, style_normal), Paragraph("<b>Referencia cliente:</b>", style_normal), Paragraph(pedido_cliente, style_normal)],
+                [Paragraph("<b>Compañía:</b>", style_normal), Paragraph(compania, style_normal), Paragraph("<b>Referencia cliente:</b>", style_normal), Paragraph(referencia_cliente, style_normal)],
                 [Paragraph("<b>Puesto:</b>", style_normal), Paragraph(puesto, style_normal), Paragraph("<b>Fecha:</b>", style_normal), Paragraph(fecha_remision.strftime('%d / %m / %Y'), style_normal)],
                 [Paragraph("<b>Email:</b>", style_normal), Paragraph(email, style_normal), Paragraph("<b>Referencia:</b>", style_normal), Paragraph(referencia, style_normal)],
                 [Paragraph("<b>Cel:</b>", style_normal), Paragraph(cel, style_normal), Paragraph("", style_normal), Paragraph("", style_normal)]
             ]
             
-            t_meta = Table(data_meta, colWidths=[90, 200, 110, 140])
+            t_meta = Table(data_meta, colWidths=[95, 195, 110, 140])
             t_meta.setStyle(TableStyle([
                 ('VALIGN', (0,0), (-1,-1), 'TOP'),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 5),
             ]))
             story.append(t_meta)
-            story.append(Spacer(1, 20))
+            story.append(Spacer(1, 25))
             
+            texto_oficial = f"Referente a su pedido {referencia_cliente} recibido el {fecha_recibido_str}. Se hace entrega de {cantidad_piezas} piezas de respaldo de silla modelo Suiza."
             style_cuerpo = ParagraphStyle('CuerpoRem', parent=style_normal, fontName='Helvetica', fontSize=11, leading=16, textColor=colors.HexColor('#0F172A'))
-            story.append(Paragraph(texto_pedido, style_cuerpo))
-            story.append(Spacer(1, 150))
+            story.append(Paragraph(texto_oficial, style_cuerpo))
+            
+            story.append(Spacer(1, 180))
             
             data_firmas = [
                 [Paragraph("___________________________________", style_normal), Paragraph("___________________________________", style_normal)],
