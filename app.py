@@ -303,10 +303,6 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             
         with col2:
             referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
-            documento = "FTO:2026-REM-1"
-            st.text_input("Documento", value=documento, disabled=True)
-            referencia_cliente = oc_actual
-            st.text_input("Referencia cliente (OC)", value=oc_actual, disabled=True)
             fecha_remision = st.date_input("Fecha de emisión", datetime.now())
             cantidad_piezas = st.number_input("Cantidad de piezas a entregar", min_value=1, value=max(1, int(piezas_producidas_total)))
 
@@ -334,3 +330,131 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             style_logo = ParagraphStyle('LogoCrealag', fontName='Helvetica-Bold', fontSize=28, textColor=colors.HexColor('#0A0F1D'), leading=30)
             story.append(Paragraph("<b>crealag</b>", style_logo))
             story.append(Spacer(1, 4))
+            
+            tabla_linea = Table([['']], colWidths=[540], rowHeights=[2.5])
+            tabla_linea.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#0A0F1D')),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+                ('TOPPADDING', (0,0), (-1,-1), 0),
+            ]))
+            story.append(tabla_linea)
+            story.append(Spacer(1, 20))
+            
+            # 2. BLOQUE DE CAMPOS VERTICALES
+            style_label = ParagraphStyle('LabelEstilo', fontName='Helvetica-Bold', fontSize=10, textColor=colors.HexColor('#0F172A'))
+            style_val = ParagraphStyle('ValEstilo', fontName='Helvetica', fontSize=10, textColor=colors.HexColor('#0F172A'))
+            
+            data_campos = [
+                [Paragraph("<b>Atención:</b>", style_label), Paragraph(atencion, style_val)],
+                [Paragraph("<b>Compañía:</b>", style_label), Paragraph(compania, style_val)],
+                [Paragraph("<b>Puesto:</b>", style_label), Paragraph(puesto, style_val)],
+                [Paragraph("<b>Email:</b>", style_label), Paragraph(email, style_val)],
+                [Paragraph("<b>Cel:</b>", style_label), Paragraph(cel, style_val)],
+                [Paragraph("<b>Referencia:</b>", style_label), Paragraph(referencia, style_val)],
+                [Paragraph("<b>Documento:</b>", style_label), Paragraph("FTO:2026-REM-1", style_val)],
+                [Paragraph("<b>Referencia cliente:</b>", style_label), Paragraph(oc_actual, style_val)],
+                [Paragraph("<b>Fecha:</b>", style_label), Paragraph(fecha_remision.strftime('%d / %m / %Y'), style_val)],
+            ]
+            
+            t_campos = Table(data_campos, colWidths=[130, 380])
+            t_campos.setStyle(TableStyle([
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+                ('TOPPADDING', (0,0), (-1,-1), 3),
+            ]))
+            story.append(t_campos)
+            story.append(Spacer(1, 20))
+            
+            # 3. TEXTO OFICIAL
+            texto_cuerpo = f"Referente a su pedido {oc_actual} recibido el {fecha_recibido_str}. Se hace entrega de {cantidad_piezas} piezas de respaldo de silla modelo Suiza (Orden de Compra: {oc_actual})."
+            style_cuerpo = ParagraphStyle('CuerpoRemision', fontName='Helvetica', fontSize=10.5, leading=16, textColor=colors.HexColor('#0F172A'))
+            story.append(Paragraph(texto_cuerpo, style_cuerpo))
+            story.append(Spacer(1, 15))
+            
+            # 4. CARGA DE IMÁGENES
+            cad_img_obj = None
+            silla_img_obj = None
+            
+            for ruta_cad in ["cad_respaldo.png", "cad_respaldo.jpg", "./cad_respaldo.png", "./cad_respaldo.jpg"]:
+                if os.path.exists(ruta_cad):
+                    cad_img_obj = RLImage(ruta_cad, width=170, height=140)
+                    break
+
+            for ruta_silla in ["silla_terminada.png", "silla_terminada.jpg", "./silla_terminada.png", "./silla_terminada.jpg"]:
+                if os.path.exists(ruta_silla):
+                    silla_img_obj = RLImage(ruta_silla, width=140, height=170)
+                    break
+
+            if cad_img_obj or silla_img_obj:
+                img_data = [[cad_img_obj if cad_img_obj else "", silla_img_obj if silla_img_obj else ""]]
+                t_imgs = Table(img_data, colWidths=[270, 270])
+                t_imgs.setStyle(TableStyle([
+                    ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                    ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ]))
+                story.append(t_imgs)
+                story.append(Spacer(1, 20))
+            else:
+                story.append(Spacer(1, 60))
+            
+            # 5. LÍNEAS DE FIRMA CON TEXTO CENTRADO
+            style_firma_texto = ParagraphStyle('FirmaTexto', fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#0F172A'), alignment=1)
+            
+            data_firmas = [
+                [Paragraph("____________________________________________", style_normal), Paragraph("____________________________________________", style_normal)],
+                [Paragraph("ENTREGA", style_firma_texto), Paragraph("NOMBRE Y FIRMA RECIBE", style_firma_texto)]
+            ]
+            t_firmas = Table(data_firmas, colWidths=[270, 270])
+            t_firmas.setStyle(TableStyle([
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+                ('TOPPADDING', (0,0), (-1,-1), 2),
+            ]))
+            story.append(t_firmas)
+            story.append(Spacer(1, 20))
+            
+            # 6. PIE DE PÁGINA OFICIAL
+            story.append(tabla_linea)
+            story.append(Spacer(1, 8))
+            
+            style_foot_val = ParagraphStyle('FootVal', fontName='Helvetica', fontSize=7.5, textColor=colors.HexColor('#0F172A'), leading=9)
+            
+            col_contacto = [
+                Paragraph("<b>Contacto:</b> contacto@crealag.mx", style_foot_val),
+                Paragraph("<b>Web:</b> crealag.com", style_foot_val),
+                Paragraph("<b>Tel:</b> +52 871 185 5001", style_foot_val),
+            ]
+            
+            col_direccion = [
+                Paragraph("<b>Crealag SA de CV</b>", style_foot_val),
+                Paragraph("Perif. Gomez Lerdo KM12 No. 0", style_foot_val),
+                Paragraph("Periferico C.P.35150 CD Lerdo Durango", style_foot_val),
+            ]
+            
+            col_folio = [
+                Paragraph("", style_foot_val),
+                Paragraph("", style_foot_val),
+                Paragraph("FTO:2026-REM-1", style_foot_val),
+            ]
+            
+            t_footer = Table([[col_contacto, col_direccion, col_folio]], colWidths=[180, 240, 100])
+            t_footer.setStyle(TableStyle([
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('ALIGN', (2,0), (2,-1), 'RIGHT'),
+            ]))
+            story.append(t_footer)
+            
+            doc.build(story)
+            buffer.seek(0)
+            return buffer
+
+        pdf_buffer = generar_pdf_original()
+        
+        st.success("¡Remisión con formato original Crealag generada con éxito!")
+        st.download_button(
+            label="📥 Descargar Remisión en PDF",
+            data=pdf_buffer,
+            file_name="Remision.pdf",
+            mime="application/pdf"
+        )
