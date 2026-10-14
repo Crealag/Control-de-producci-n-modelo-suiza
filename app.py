@@ -67,22 +67,22 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Archivo de configuración local para la OC activa
-CONFIG_FILE = "oc_config.csv"
+# Archivo de configuración local para el registro y catálogo de Órdenes de Compra
+CONFIG_FILE = "oc_catalogo.csv"
 
-def cargar_config_oc():
+def cargar_catalogo_ocs():
     import os
     if os.path.exists(CONFIG_FILE):
         df_cfg = pd.read_csv(CONFIG_FILE)
         if not df_cfg.empty:
-            return str(df_cfg.iloc[0]["Orden_Compra"]), int(df_cfg.iloc[0]["Meta_Piezas"])
-    return "HER-080526", 100
+            return df_cfg
+    # Catálogo inicial por defecto
+    return pd.DataFrame([{"Orden_Compra": "HER-080526", "Meta_Piezas": 100}])
 
-def guardar_config_oc(oc, meta):
-    df_cfg = pd.DataFrame([{"Orden_Compra": oc, "Meta_Piezas": meta}])
+def guardar_catalogo_ocs(df_cfg):
     df_cfg.to_csv(CONFIG_FILE, index=False)
 
-oc_actual, meta_actual = cargar_config_oc()
+df_ocs_catalogo = cargar_catalogo_ocs()
 
 # --- FUNCIONES DE BASE DE DATOS (SUPABASE) ---
 def cargar_datos_supabase():
@@ -114,7 +114,7 @@ def insertar_registro(orden, fecha, hora, piezas, observaciones):
 
 df = cargar_datos_supabase()
 
-# --- NAVEGACIÓN EN LA BARRA LATERAL (SUPERIOR IZQUIERDA) ---
+# --- BARRA LATERAL (Navegación y Administración de Órdenes de Compra) ---
 with st.sidebar:
     st.markdown("<h2 class='brand-title' style='color: #D4AF37; margin-bottom: 0px;'>crealag</h2>", unsafe_allow_html=True)
     st.caption("Fabricante mueblerio metalformado A.C. e INOX")
@@ -125,16 +125,29 @@ with st.sidebar:
         ["📊 Producción y Registro", "📄 Generador de Remisiones"]
     )
     
-    if menu_seleccionado == "📊 Producción y Registro":
-        st.markdown("---")
-        st.header("📦 Configuración OC")
-        nueva_oc = st.text_input("Número de OC:", value=oc_actual)
-        nueva_meta = st.number_input("Meta de piezas:", min_value=1, value=int(meta_actual), step=10)
+    st.markdown("---")
+    st.header("📦 Órdenes de Compra")
+    
+    # Selector de la OC activa en todo el sistema
+    lista_ocs = df_ocs_catalogo["Orden_Compra"].tolist()
+    oc_actual = st.selectbox("Seleccionar OC Activa:", lista_ocs)
+    
+    # Obtener la meta de la OC seleccionada
+    meta_actual = int(df_ocs_catalogo[df_ocs_catalogo["Orden_Compra"] == oc_actual]["Meta_Piezas"].values[0])
+    
+    with st.expander("➕ Registrar Nueva Orden de Compra"):
+        nueva_oc_input = st.text_input("Nueva OC (Ej. HER-101026)")
+        nueva_meta_input = st.number_input("Meta de piezas:", min_value=1, value=100, step=10)
         
-        if st.button("Actualizar OC", type="primary"):
-            guardar_config_oc(nueva_oc, nueva_meta)
-            st.success("✅ Actualizado.")
-            st.rerun()
+        if st.button("Guardar Nueva OC"):
+            if nueva_oc_input and nueva_oc_input not in lista_ocs:
+                nuevo_row = pd.DataFrame([{"Orden_Compra": nueva_oc_input, "Meta_Piezas": nueva_meta_input}])
+                df_ocs_catalogo = pd.concat([df_ocs_catalogo, nuevo_row], ignore_index=True)
+                guardar_catalogo_ocs(df_ocs_catalogo)
+                st.success(f"✅ OC `{nueva_oc_input}` registrada.")
+                st.rerun()
+            elif nueva_oc_input in lista_ocs:
+                st.warning("Esta Orden de Compra ya existe en el catálogo.")
 
 # Título principal con branding integrado
 st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Control de Producción y Remisiones</span></h1>", unsafe_allow_html=True)
@@ -149,8 +162,8 @@ if menu_seleccionado == "📊 Producción y Registro":
     st.subheader(f"Panel de Control - Orden Activa: `{oc_actual}`")
 
     m1, m2, m3 = st.columns(3)
-    m1.metric("OC Actual", oc_actual)
-    m2.metric("Producidas", f"{piezas_producidas_oc} / {meta_actual}")
+    m1.metric("OC Activa", oc_actual)
+    m2.metric("Producidas / Meta", f"{piezas_producidas_oc} / {meta_actual}")
     m3.metric("Avance", f"{int(porcentaje * 100)}%")
 
     st.progress(porcentaje)
@@ -231,37 +244,53 @@ if menu_seleccionado == "📊 Producción y Registro":
 
     st.markdown("---")
 
-    # --- GRÁFICAS ADAPTABLES ---
+    # --- GRÁFICAS ADAPTABLES (Por Día y Por Hora 8am-6pm excluyendo comida 1pm-2pm) ---
     st.subheader("📈 Gráficas de Rendimiento")
     col_g1, col_g2 = st.columns(2)
 
     with col_g1:
-        st.markdown("##### 🕒 Ritmo Diario (Por Hora)")
+        st.markdown("##### 🕒 Ritmo por Hora (8:00 AM - 6:00 PM)")
         hoy_str = datetime.now().strftime("%Y-%m-%d")
         df_hoy = df[df["fecha"] == hoy_str] if not df.empty and "fecha" in df.columns else pd.DataFrame()
 
         if not df_hoy.empty:
-            df_hoy_copia = df_hoy.copy()
-            df_hoy_copia['Hora_Corta'] = pd.to_datetime(df_hoy_copia['hora'], format='%H:%M:%S', errors='coerce').dt.strftime('%H:00')
-            df_por_hora = df_hoy_copia.groupby('Hora_Corta')['piezas_producidas'].sum()
-            st.line_chart(df_por_hora)
+            df_h = df_hoy.copy()
+            # Extraer la hora en formato entero para filtrar el horario laboral de 8 a 18 horas excluyendo las 13 hrs (comida)
+            df_h['Hora_Int'] = pd.to_datetime(df_h['hora'], format='%H:%M:%S', errors='coerce').dt.hour
+            # Filtrar de 8:00 a 18:00 excluyendo la hora 13 (1:00 PM a 2:00 PM)
+            df_h = df_h[(df_h['Hora_Int'] >= 8) & (df_h['Hora_Int'] <= 18) & (df_h['Hora_Int'] != 13)]
+            
+            if not df_h.empty:
+                df_h['Rango_Hora'] = df_h['Hora_Int'].apply(lambda x: f"{x:02d}:00 - {x+1:02d}:00")
+                df_por_hora = df_h.groupby('Rango_Hora')['piezas_producidas'].sum()
+                
+                # Crear estructura completa de horas de la jornada para que la gráfica muestre los huecos si no hay producción
+                horas_jornada = [f"{h:02d}:00 - {h+1:02d}:00" for h in [8,9,10,11,12,14,15,16,17]]
+                df_por_hora = df_por_hora.reindex(horas_jornada, fill_value=0)
+                st.bar_chart(df_por_hora)
+            else:
+                st.info("💡 Sin registros en horario laboral hoy (excluyendo hora de comida 1-2 PM).")
         else:
-            st.info("💡 Sin registros hoy.")
+            st.info("💡 Sin registros para el día de hoy.")
 
     with col_g2:
-        st.markdown(f"##### 📦 Tendencia OC: `{oc_actual}`")
+        st.markdown(f"##### 📅 Producción Acumulada por Día (`{oc_actual}`)")
         if not df_oc.empty:
-            df_grafica_oc = df_oc.copy()
-            df_grafica_oc['Timestamp'] = pd.to_datetime(df_grafica_oc['fecha'] + ' ' + df_grafica_oc['hora'])
-            df_grafica_oc = df_grafica_oc.sort_values('Timestamp')
-            st.line_chart(df_grafica_oc.set_index('Timestamp')['piezas_producidas'])
+            df_dias = df_oc.copy()
+            df_por_dia = df_dias.groupby('fecha')['piezas_producidas'].sum()
+            st.line_chart(df_por_dia)
         else:
-            st.info("💡 Sin registros en la OC.")
+            st.info("💡 Sin registros diarios en esta OC.")
 
-# --- SECCIÓN 2: GENERADOR DE REMISIONES ---
+# --- SECCIÓN 2: GENERADOR DE REMISIONES (Con stock disponible en almacén) ---
 elif menu_seleccionado == "📄 Generador de Remisiones":
     st.subheader("Generador de Remisiones Oficiales")
-    st.write("Rellena los datos para generar el documento oficial en PDF con el formato Crealag.")
+    
+    # Cálculo automático de piezas disponibles en almacén para la OC activa
+    df_oc_rem = df[df["orden_compra"] == oc_actual] if not df.empty and "orden_compra" in df.columns else pd.DataFrame()
+    piezas_producidas_total = df_oc_rem["piezas_producidas"].sum() if not df_oc_rem.empty else 0
+    
+    st.info(f"📦 **Estado de Almacén para `{oc_actual}`:** Total Producido en Nube: **{piezas_producidas_total} piezas** (Meta total: {meta_actual}).")
 
     with st.form("form_remision"):
         col1, col2 = st.columns(2)
@@ -277,7 +306,9 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             documento = st.text_input("Documento (Folio)", f"{oc_actual}-REM")
             referencia_cliente = st.text_input("Referencia cliente", f"Pedido No. 01")
             fecha_remision = st.date_input("Fecha", datetime.now())
-            cantidad_piezas = st.number_input("Cantidad de piezas", min_value=1, value=15)
+            
+            # Cantidad a entregar en esta remisión (limitada al total producido disponible)
+            cantidad_piezas = st.number_input("Cantidad de piezas a entregar en esta remisión", min_value=1, max_value=max(1, piezas_producidas_total), value=min(15, piezas_producidas_total if piezas_producidas_total > 0 else 1))
 
         fecha_recibido_str = st.text_input("Fecha en que se recibió el pedido (Texto)", "08 de mayo de 2026")
 
@@ -315,7 +346,7 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             story.append(t_meta)
             story.append(Spacer(1, 25))
             
-            texto_oficial = f"Referente a su pedido {referencia_cliente} recibido el {fecha_recibido_str}. Se hace entrega de {cantidad_piezas} piezas de respaldo de silla modelo Suiza."
+            texto_oficial = f"Referente a su pedido {referencia_cliente} recibido el {fecha_recibido_str}. Se hace entrega de {cantidad_piezas} piezas de respaldo de silla modelo Suiza (Orden de Compra: {oc_actual})."
             style_cuerpo = ParagraphStyle('CuerpoRem', parent=style_normal, fontName='Helvetica', fontSize=11, leading=16, textColor=colors.HexColor('#0F172A'))
             story.append(Paragraph(texto_oficial, style_cuerpo))
             
