@@ -75,8 +75,11 @@ def cargar_catalogo_ocs():
     if os.path.exists(CONFIG_FILE):
         df_cfg = pd.read_csv(CONFIG_FILE)
         if not df_cfg.empty:
+            # Asegurar columna 'Estado' si no existe en versiones previas
+            if "Estado" not in df_cfg.columns:
+                df_cfg["Estado"] = "Activa"
             return df_cfg
-    return pd.DataFrame([{"Orden_Compra": "HER-080526", "Meta_Piezas": 100}])
+    return pd.DataFrame([{"Orden_Compra": "HER-080526", "Meta_Piezas": 100, "Estado": "Activa"}])
 
 def guardar_catalogo_ocs(df_cfg):
     df_cfg.to_csv(CONFIG_FILE, index=False)
@@ -130,15 +133,28 @@ with st.sidebar:
     lista_ocs = df_ocs_catalogo["Orden_Compra"].tolist()
     oc_actual = st.selectbox("Seleccionar OC Activa:", lista_ocs)
     
-    meta_actual = int(df_ocs_catalogo[df_ocs_catalogo["Orden_Compra"] == oc_actual]["Meta_Piezas"].values[0])
+    # Obtener estado y meta de la OC seleccionada
+    row_oc_info = df_ocs_catalogo[df_ocs_catalogo["Orden_Compra"] == oc_actual].iloc[0]
+    meta_actual = int(row_oc_info["Meta_Piezas"])
+    estado_oc = str(row_oc_info["Estado"]) if "Estado" in df_ocs_catalogo.columns else "Activa"
     
+    if estado_oc == "Cerrada":
+        st.error(f"🔒 OC `{oc_actual}` CERRADA (Solo lectura)")
+    else:
+        st.success(f"🟢 OC `{oc_actual}` Activa")
+        if st.button("🔒 Cerrar Orden Actual"):
+            df_ocs_catalogo.loc[df_ocs_catalogo["Orden_Compra"] == oc_actual, "Estado"] = "Cerrada"
+            guardar_catalogo_ocs(df_ocs_catalogo)
+            st.success(f"La OC `{oc_actual}` ha sido cerrada.")
+            st.rerun()
+
     with st.expander("➕ Registrar Nueva Orden de Compra"):
         nueva_oc_input = st.text_input("Nueva OC (Ej. HER-101026)")
         nueva_meta_input = st.number_input("Meta de piezas:", min_value=1, value=100, step=10)
         
         if st.button("Guardar Nueva OC"):
             if nueva_oc_input and nueva_oc_input not in lista_ocs:
-                nuevo_row = pd.DataFrame([{"Orden_Compra": nueva_oc_input, "Meta_Piezas": nueva_meta_input}])
+                nuevo_row = pd.DataFrame([{"Orden_Compra": [nueva_oc_input], "Meta_Piezas": [nueva_meta_input], "Estado": ["Activa"]}])
                 df_ocs_catalogo = pd.concat([df_ocs_catalogo, nuevo_row], ignore_index=True)
                 guardar_catalogo_ocs(df_ocs_catalogo)
                 st.success(f"✅ OC `{nueva_oc_input}` registrada.")
@@ -156,7 +172,7 @@ if menu_seleccionado == "📊 Producción y Registro":
     piezas_producidas_oc = df_oc["piezas_producidas"].sum() if not df_oc.empty else 0
     porcentaje = min(1.0, piezas_producidas_oc / meta_actual) if meta_actual > 0 else 0.0
 
-    st.subheader(f"Panel de Control - Orden Activa: `{oc_actual}`")
+    st.subheader(f"Panel de Control - Orden Activa: `{oc_actual}` ({estado_oc})")
 
     m1, m2, m3 = st.columns(3)
     m1.metric("OC Activa", oc_actual)
@@ -167,61 +183,56 @@ if menu_seleccionado == "📊 Producción y Registro":
 
     if piezas_producidas_oc >= meta_actual and meta_actual > 0:
         st.success(f"📌 **PRODUCCIÓN CUMPLIDA:** Se alcanzó la meta de **{piezas_producidas_oc}** piezas para la `{oc_actual}`.")
-        csv_reporte = df_oc.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Descargar Reporte Final (CSV)",
-            data=csv_reporte,
-            file_name=f"Reporte_Produccion_{oc_actual}.csv",
-            mime="text/csv",
-            type="primary"
-        )
 
     st.markdown("---")
 
-    # CAPTURA
-    st.subheader("➕ Registrar Piezas")
-    tipo_captura = st.radio("Modo de registro:", ["Rápido / Actual", "Pasado (Fecha/Hora)"], horizontal=True)
-
-    piezas_sumar = 0
-    fecha_registro = datetime.now().strftime("%Y-%m-%d")
-    hora_registro = datetime.now().strftime("%H:%M:%S")
-
-    if tipo_captura == "Rápido / Actual":
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            st.markdown("**Botones rápidos**")
-            b1, b2, b3 = st.columns(3)
-            if b1.button("+10"): piezas_sumar = 10
-            if b2.button("+50"): piezas_sumar = 50
-            if b3.button("+100"): piezas_sumar = 100
-
-        with col2:
-            st.markdown("**Ingreso manual**")
-            cantidad_manual = st.number_input("Cantidad:", min_value=0, value=0, step=1, key="manual_actual")
-            if st.button("Guardar", type="primary"):
-                if cantidad_manual > 0:
-                    piezas_sumar = cantidad_manual
-                else:
-                    st.warning("Ingresa un valor mayor a 0.")
+    # CAPTURA (Solo habilitada si la OC está Activa)
+    if estado_oc == "Cerrada":
+        st.warning(f"⚠️ La Orden de Compra **{oc_actual}** está cerrada. El panel se encuentra en modo de solo lectura.")
     else:
-        st.markdown("**Registro con Fecha y Hora Personalizada**")
-        f_pasada = st.date_input("Fecha:", value=date.today())
-        h_pasada = st.time_input("Hora:", value=datetime.now().time())
-        cantidad_pasada = st.number_input("Cantidad de piezas:", min_value=1, value=10, step=1, key="manual_pasada")
-        
-        fecha_registro = f_pasada.strftime("%Y-%m-%d")
-        hora_registro = h_pasada.strftime("%H:%M:%S")
-        
-        if st.button("Guardar Registro Pasado", type="primary"):
-            piezas_sumar = cantidad_pasada
+        st.subheader("➕ Registrar Piezas")
+        tipo_captura = st.radio("Modo de registro:", ["Rápido / Actual", "Pasado (Fecha/Hora)"], horizontal=True)
 
-    observaciones_turno = st.text_input("Observaciones del Turno:", placeholder="Ej. Ajuste en prensa...")
+        piezas_sumar = 0
+        fecha_registro = datetime.now().strftime("%Y-%m-%d")
+        hora_registro = datetime.now().strftime("%H:%M:%S")
 
-    if piezas_sumar > 0:
-        exito = insertar_registro(oc_actual, fecha_registro, hora_registro, piezas_sumar, observaciones_turno if observaciones_turno else "Sin observaciones")
-        if exito:
-            st.success(f"✅ ¡Registradas {piezas_sumar} piezas en Supabase!")
-            st.rerun()
+        if tipo_captura == "Rápido / Actual":
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.markdown("**Botones rápidos**")
+                b1, b2, b3 = st.columns(3)
+                if b1.button("+10"): piezas_sumar = 10
+                if b2.button("+50"): piezas_sumar = 50
+                if b3.button("+100"): piezas_sumar = 100
+
+            with col2:
+                st.markdown("**Ingreso manual**")
+                cantidad_manual = st.number_input("Cantidad:", min_value=0, value=0, step=1, key="manual_actual")
+                if st.button("Guardar", type="primary"):
+                    if cantidad_manual > 0:
+                        piezas_sumar = cantidad_manual
+                    else:
+                        st.warning("Ingresa un valor mayor a 0.")
+        else:
+            st.markdown("**Registro con Fecha y Hora Personalizada**")
+            f_pasada = st.date_input("Fecha:", value=date.today())
+            h_pasada = st.time_input("Hora:", value=datetime.now().time())
+            cantidad_pasada = st.number_input("Cantidad de piezas:", min_value=1, value=10, step=1, key="manual_pasada")
+            
+            fecha_registro = f_pasada.strftime("%Y-%m-%d")
+            hora_registro = h_pasada.strftime("%H:%M:%S")
+            
+            if st.button("Guardar Registro Pasado", type="primary"):
+                piezas_sumar = cantidad_pasada
+
+        observaciones_turno = st.text_input("Observaciones del Turno:", placeholder="Ej. Ajuste en prensa...")
+
+        if piezas_sumar > 0:
+            exito = insertar_registro(oc_actual, fecha_registro, hora_registro, piezas_sumar, observaciones_turno if observaciones_turno else "Sin observaciones")
+            if exito:
+                st.success(f"✅ ¡Registradas {piezas_sumar} piezas en Supabase!")
+                st.rerun()
 
     st.markdown("---")
 
@@ -231,9 +242,9 @@ if menu_seleccionado == "📊 Producción y Registro":
         st.dataframe(df_oc.sort_values(by="id", ascending=False), use_container_width=True)
         csv_reporte_gen = df_oc.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Descargar Reporte Parcial",
+            label="📥 Descargar Reporte Parcial (CSV)",
             data=csv_reporte_gen,
-            file_name=f"Reporte_Parcial_{oc_actual}.csv",
+            file_name=f"Reporte_Produccion_{oc_actual}.csv",
             mime="text/csv"
         )
     else:
@@ -275,7 +286,7 @@ if menu_seleccionado == "📊 Producción y Registro":
         else:
             st.info("💡 Sin registros diarios en esta OC.")
 
-# --- SECCIÓN 2: GENERADOR DE REMISIONES (FORMATO ORIGINAL CREALAG CON IMÁGENES AUTOMÁTICAS) ---
+# --- SECCIÓN 2: GENERADOR DE REMISIONES ---
 elif menu_seleccionado == "📄 Generador de Remisiones":
     st.subheader("Generador de Remisiones Oficiales - Formato Original Crealag")
     
@@ -295,8 +306,8 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             
         with col2:
             referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
-            documento = st.text_input("Documento", f"HER-080526-REM")
-            referencia_cliente = st.text_input("Referencia cliente", "Pedido No. 01")
+            documento = st.text_input("Documento", f"{oc_actual}-REM")
+            referencia_cliente = st.text_input("Referencia cliente (OC)", oc_actual)
             fecha_remision = st.date_input("Fecha de emisión", datetime.now())
             cantidad_piezas = st.number_input("Cantidad de piezas a entregar", min_value=1, value=max(1, int(piezas_producidas_total)))
 
@@ -325,7 +336,6 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             story.append(Paragraph("<b>crealag</b>", style_logo))
             story.append(Spacer(1, 4))
             
-            # Línea horizontal oscura superior
             tabla_linea = Table([['']], colWidths=[540], rowHeights=[2.5])
             tabla_linea.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#0A0F1D')),
@@ -335,7 +345,7 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             story.append(tabla_linea)
             story.append(Spacer(1, 20))
             
-            # 2. BLOQUE DE CAMPOS VERTICALES
+            # 2. BLOQUE DE CAMPOS VERTICALES (Referencia cliente = OC)
             style_label = ParagraphStyle('LabelEstilo', fontName='Helvetica-Bold', fontSize=10, textColor=colors.HexColor('#0F172A'))
             style_val = ParagraphStyle('ValEstilo', fontName='Helvetica', fontSize=10, textColor=colors.HexColor('#0F172A'))
             
@@ -345,9 +355,9 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
                 [Paragraph("<b>Puesto:</b>", style_label), Paragraph(puesto, style_val)],
                 [Paragraph("<b>Email:</b>", style_label), Paragraph(email, style_val)],
                 [Paragraph("<b>Cel:</b>", style_label), Paragraph(cel, style_val)],
-                [Paragraph("<b>Referencia:</b>", style_label), Paragraph(f"{referencia}", style_val)],
+                [Paragraph("<b>Referencia:</b>", style_label), Paragraph(referencia, style_val)],
                 [Paragraph("<b>Documento:</b>", style_label), Paragraph(documento, style_val)],
-                [Paragraph("<b>Referencia cliente:</b>", style_label), Paragraph(referencia_cliente, style_val)],
+                [Paragraph("<b>Referencia cliente:</b>", style_label), Paragraph(oc_actual, style_val)],
                 [Paragraph("<b>Fecha:</b>", style_label), Paragraph(fecha_remision.strftime('%d / %m / %Y'), style_val)],
             ]
             
@@ -360,54 +370,57 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             story.append(t_campos)
             story.append(Spacer(1, 25))
             
-            # 3. TEXTO OFICIAL DE LA REMISIÓN
-            texto_cuerpo = f"Referente a su pedido {referencia_cliente} recibido el {fecha_recibido_str}. Se hace entrega de {cantidad_piezas} piezas de respaldo de silla modelo Suiza (Orden de Compra: {oc_actual})."
+            # 3. TEXTO OFICIAL (Incluye la OC inmediatamente después de "pedido")
+            texto_cuerpo = f"Referente a su pedido {oc_actual} recibido el {fecha_recibido_str}. Se hace entrega de {cantidad_piezas} piezas de respaldo de silla modelo Suiza (Orden de Compra: {oc_actual})."
             style_cuerpo = ParagraphStyle('CuerpoRemision', fontName='Helvetica', fontSize=10.5, leading=16, textColor=colors.HexColor('#0F172A'))
             story.append(Paragraph(texto_cuerpo, style_cuerpo))
             story.append(Spacer(1, 20))
             
-            # 4. CARGA AUTOMÁTICA DE IMÁGENES GUARDADAS EN EL REPOSITORIO
+            # 4. CARGA DE IMÁGENES (Verificación robusta de rutas y archivos)
             cad_img_obj = None
             silla_img_obj = None
             
-            if os.path.exists("cad_respaldo.png"):
-                cad_img_obj = RLImage("cad_respaldo.png", width=180, height=150)
-            elif os.path.exists("cad_respaldo.jpg"):
-                cad_img_obj = RLImage("cad_respaldo.jpg", width=180, height=150)
+            for ruta_cad in ["cad_respaldo.png", "cad_respaldo.jpg", "./cad_respaldo.png", "./cad_respaldo.jpg"]:
+                if os.path.exists(ruta_cad):
+                    cad_img_obj = RLImage(ruta_cad, width=170, height=140)
+                    break
 
-            if os.path.exists("silla_terminada.png"):
-                silla_img_obj = RLImage("silla_terminada.png", width=150, height=180)
-            elif os.path.exists("silla_terminada.jpg"):
-                silla_img_obj = RLImage("silla_terminada.jpg", width=150, height=180)
+            for ruta_silla in ["silla_terminada.png", "silla_terminada.jpg", "./silla_terminada.png", "./silla_terminada.jpg"]:
+                if os.path.exists(ruta_silla):
+                    silla_img_obj = RLImage(ruta_silla, width=140, height=170)
+                    break
 
             if cad_img_obj or silla_img_obj:
                 img_data = [[cad_img_obj if cad_img_obj else "", silla_img_obj if silla_img_obj else ""]]
-                t_imgs = Table(img_data, colWidths=[260, 260])
+                t_imgs = Table(img_data, colWidths=[270, 270])
                 t_imgs.setStyle(TableStyle([
                     ('ALIGN', (0,0), (-1,-1), 'CENTER'),
                     ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
                 ]))
                 story.append(t_imgs)
-                story.append(Spacer(1, 30))
+                story.append(Spacer(1, 25))
             else:
-                story.append(Spacer(1, 100))
+                story.append(Spacer(1, 80))
             
-            # 5. LÍNEAS DE FIRMA
+            # 5. LÍNEAS DE FIRMA CON TEXTO EXACTAMENTE CENTRADO BAJO CADA LÍNEA
+            style_firma_texto = ParagraphStyle('FirmaTexto', fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#0F172A'), alignment=1) # alignment=1 es CENTRADO
+            
             data_firmas = [
-                [Paragraph("___________________________________", style_normal), Paragraph("___________________________________", style_normal)],
-                [Paragraph("<b>ENTREGA</b>", style_normal), Paragraph("<b>NOMBRE Y FIRMA RECIBE</b>", style_normal)]
+                [Paragraph("____________________________________________", style_normal), Paragraph("____________________________________________", style_normal)],
+                [Paragraph("ENTREGA", style_firma_texto), Paragraph("NOMBRE Y FIRMA RECIBE", style_firma_texto)]
             ]
-            t_firmas = Table(data_firmas, colWidths=[260, 260])
+            t_firmas = Table(data_firmas, colWidths=[270, 270])
             t_firmas.setStyle(TableStyle([
                 ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+                ('TOPPADDING', (0,0), (-1,-1), 2),
             ]))
             story.append(t_firmas)
             story.append(Spacer(1, 25))
             
             # 6. PIE DE PÁGINA CON LÍNEA INFERIOR Y DATOS OFICIALES
-            story.append(tabla_linea) # Línea oscura inferior
+            story.append(tabla_linea)
             story.append(Spacer(1, 8))
             
             style_foot_val = ParagraphStyle('FootVal', fontName='Helvetica', fontSize=7.5, textColor=colors.HexColor('#0F172A'), leading=9)
