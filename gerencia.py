@@ -155,4 +155,17 @@ else:
 
     # HISTORIAL DE REGISTROS
     st.markdown(f"### 📑 Historial de Fabricación - `{oc_actual}`")
-    if not df
+    if not df_oc_prod.empty:
+        df_mostrar = df_oc_prod.sort_values(by="id", ascending=False)[["fecha", "hora", "piezas_producidas", "observaciones_turno"]]
+        df_mostrar.columns = ["Fecha", "Hora", "Piezas Producidas", "Observaciones del Turno"]
+        st.dataframe(df_mostrar, use_container_width=True)
+        
+        csv_reporte_gen = df_oc_prod.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Descargar Reporte de esta Orden (CSV)",
+            data=csv_reporte_gen,
+            file_name=f"Reporte_Gerencial_{oc_actual}.csv",
+            mime="text/csv"
+        )
+    else:
+        st.info("Aún no hay registros de producción para esta orden en la base de datos.")
