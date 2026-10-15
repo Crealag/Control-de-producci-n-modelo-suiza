@@ -454,4 +454,61 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             
             data_firmas = [
                 [Paragraph("____________________________________________", style_normal), Paragraph("____________________________________________", style_normal)],
-                [Paragraph("ENTREGA", style_firma_texto), Paragraph("NOMBRE Y FIRMA RECIBE",
+                [Paragraph("ENTREGA", style_firma_texto), Paragraph("NOMBRE Y FIRMA RECIBE", style_firma_texto)]
+            ]
+            t_firmas = Table(data_firmas, colWidths=[270, 270])
+            t_firmas.setStyle(TableStyle([
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+                ('TOPPADDING', (0,0), (-1,-1), 2),
+            ]))
+            story.append(t_firmas)
+            
+            # Espacio para empujar el pie de página exactamente al fondo de la hoja
+            story.append(Spacer(1, 75))
+            
+            # 6. PIE DE PÁGINA OFICIAL
+            story.append(tabla_linea)
+            story.append(Spacer(1, 6))
+            
+            style_foot_val = ParagraphStyle('FootVal', fontName='Helvetica', fontSize=7.5, textColor=colors.HexColor('#0F172A'), leading=9)
+            
+            col_contacto = [
+                Paragraph("<b>Contacto:</b> contacto@crealag.mx", style_foot_val),
+                Paragraph("<b>Web:</b> crealag.com", style_foot_val),
+                Paragraph("<b>Tel:</b> +52 871 185 5001", style_foot_val),
+            ]
+            
+            col_direccion = [
+                Paragraph("<b>Crealag SA de CV</b>", style_foot_val),
+                Paragraph("Perif. Gomez Lerdo KM12 No. 0", style_foot_val),
+                Paragraph("Periferico C.P.35150 CD Lerdo Durango", style_foot_val),
+            ]
+            
+            col_folio = [
+                Paragraph("", style_foot_val),
+                Paragraph("", style_foot_val),
+                Paragraph("FTO:2026-REM-1", style_foot_val),
+            ]
+            
+            t_footer = Table([[col_contacto, col_direccion, col_folio]], colWidths=[180, 240, 100])
+            t_footer.setStyle(TableStyle([
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('ALIGN', (2,0), (2,-1), 'RIGHT'),
+            ]))
+            story.append(t_footer)
+            
+            doc.build(story)
+            buffer.seek(0)
+            return buffer
+
+        pdf_buffer = generar_pdf_original()
+        
+        st.success("¡Remisión con formato original Crealag generada con éxito!")
+        st.download_button(
+            label="📥 Descargar Remisión en PDF",
+            data=pdf_buffer,
+            file_name="Remision.pdf",
+            mime="application/pdf"
+        )
