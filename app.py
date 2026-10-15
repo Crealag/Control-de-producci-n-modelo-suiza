@@ -25,7 +25,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS
+# Estilos CSS con paleta Crealag
 st.markdown("""
     <style>
     .stApp { background-color: #0A0F1D; color: #F8FAFC; }
@@ -47,19 +47,34 @@ def cargar_catalogo_ocs():
         res = supabase.table("Órdenes_Compra").select("*").execute()
         if res.data:
             return pd.DataFrame(res.data)
-    except Exception:
-        pass
+    except Exception as e:
+        st.error(f"Error al cargar catálogo: {e}")
     return pd.DataFrame([{"orden_compra": "HC-0505", "meta_piezas": 100, "estado": "Activa", "piezas_entregadas": 0}])
 
 def guardar_nueva_oc(orden, meta):
-    supabase.table("Órdenes_Compra").insert({"orden_compra": orden, "meta_piezas": int(meta), "estado": "Activa"}).execute()
+    try:
+        supabase.table("Órdenes_Compra").insert({"orden_compra": orden, "meta_piezas": int(meta), "estado": "Activa"}).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error al guardar nueva OC: {e}")
+        return False
 
 def actualizar_oc_supabase(orden, meta, estado):
-    supabase.table("Órdenes_Compra").update({"meta_piezas": int(meta), "estado": estado}).eq("orden_compra", orden).execute()
+    try:
+        supabase.table("Órdenes_Compra").update({"meta_piezas": int(meta), "estado": estado}).eq("orden_compra", orden).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error al actualizar la OC: {e}")
+        return False
 
 def eliminar_oc_supabase(orden):
-    supabase.table("Órdenes_Compra").delete().eq("orden_compra", orden).execute()
-    supabase.table("Producción").delete().eq("orden_compra", orden).execute()
+    try:
+        supabase.table("Órdenes_Compra").delete().eq("orden_compra", orden).execute()
+        supabase.table("Producción").delete().eq("orden_compra", orden).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error al eliminar la OC: {e}")
+        return False
 
 def cargar_datos_supabase():
     try:
@@ -160,53 +175,27 @@ with st.sidebar:
     menu_seleccionado = st.selectbox("Navegación del Sistema", ["📊 Producción y Registro", "📄 Generador de Remisiones"])
     st.markdown("---")
     
-    col_oc_title, col_oc_btn = st.columns([4, 1])
-    with col_oc_title:
-        st.header("📦 Órdenes")
-    with col_oc_btn:
-        with st.popover("⋮"):
-            st.markdown("### Opciones de OC")
-            accion_oc = st.radio("Acción:", ["Editar Meta/Estado", "Eliminar OC Actual"], key="menu_3_puntos_oc")
-
-    lista_ocs = df_ocs_catalogo["orden_compra"].tolist()
+    st.header("📦 Órdenes de Compra")
+    lista_ocs = df_ocs_catalogo["orden_compra"].tolist() if not df_ocs_catalogo.empty else ["HC-0505"]
     oc_actual = st.selectbox("Seleccionar OC Activa:", lista_ocs)
     
-    row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc[0]
-    meta_actual = int(row_oc_info["meta_piezas"])
-    estado_oc = str(row_oc_info["estado"])
+    row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc[0] if not df_ocs_catalogo.empty and oc_actual in df_ocs_catalogo["orden_compra"].values else {"meta_piezas": 100, "estado": "Activa"}
+    meta_actual = int(row_oc_info.get("meta_piezas", 100))
+    estado_oc = str(row_oc_info.get("estado", "Activa"))
     
     if estado_oc == "Cerrada":
         st.error(f"🔒 OC `{oc_actual}` CERRADA (Solo lectura)")
     else:
         st.success(f"🟢 OC `{oc_actual}` Activa")
 
-    if accion_oc == "Editar Meta/Estado":
-        with st.expander("✏️ Configurar Orden Actual", expanded=True):
-            meta_editada = st.number_input("Meta de piezas:", min_value=1, value=meta_actual, step=10, key="edit_meta_input")
-            estado_editado = st.selectbox("Estado de la OC:", ["Activa", "Cerrada"], index=0 if estado_oc == "Activa" else 1, key="edit_estado_input")
-            if st.button("Guardar Cambios OC"):
-                actualizar_oc_supabase(oc_actual, meta_editada, estado_editado)
-                st.success(f"✅ OC `{oc_actual}` actualizada en la nube.")
-                st.rerun()
-    elif accion_oc == "Eliminar OC Actual":
-        with st.expander("🗑️ Zona de Peligro", expanded=True):
-            st.warning(f"¿Eliminar `{oc_actual}` y todos sus registros?")
-            if st.button("⚠️ Confirmar Eliminación", type="primary"):
-                if len(df_ocs_catalogo) > 1:
-                    eliminar_oc_supabase(oc_actual)
-                    st.success(f"🗑️ OC `{oc_actual}` eliminada por completo.")
-                    st.rerun()
-                else:
-                    st.error("No puedes eliminar la última Orden de Compra.")
-
     with st.expander("➕ Registrar Nueva Orden de Compra"):
         nueva_oc_input = st.text_input("Nueva OC (Ej. HER-101026)")
         nueva_meta_input = st.number_input("Meta de piezas:", min_value=1, value=100, step=10)
         if st.button("Guardar Nueva OC"):
             if nueva_oc_input and nueva_oc_input not in lista_ocs:
-                guardar_nueva_oc(nueva_oc_input, nueva_meta_input)
-                st.success(f"✅ OC `{nueva_oc_input}` creada en la nube.")
-                st.rerun()
+                if guardar_nueva_oc(nueva_oc_input, nueva_meta_input):
+                    st.success(f"✅ OC `{nueva_oc_input}` creada en la nube.")
+                    st.rerun()
 
 # --- VISTA PRINCIPAL ---
 st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Control de Producción y Remisiones</span></h1>", unsafe_allow_html=True)
@@ -218,6 +207,31 @@ if menu_seleccionado == "📊 Producción y Registro":
     porcentaje = min(1.0, piezas_producidas_oc / meta_actual) if meta_actual > 0 else 0.0
 
     st.subheader(f"Panel de Control - Orden Activa: `{oc_actual}` ({estado_oc})")
+    
+    # Opciones de administración de la OC activa directamente en la pantalla principal
+    with st.expander(f"⚙️ Configurar / Eliminar Orden `{oc_actual}`"):
+        with st.form("form_edit_oc"):
+            st.markdown("#### Ajustar Meta y Estado en Supabase")
+            col_m1, col_m2 = st.columns(2)
+            meta_editada = col_m1.number_input("Meta de piezas:", min_value=1, value=meta_actual, step=10)
+            estado_editado = col_m2.selectbox("Estado de la OC:", ["Activa", "Cerrada"], index=0 if estado_oc == "Activa" else 1)
+            
+            btn_guardar_oc = st.form_submit_button("💾 Guardar Cambios en OC", type="primary")
+            if btn_guardar_oc:
+                if actualizar_oc_supabase(oc_actual, meta_editada, estado_editado):
+                    st.success(f"✅ OC `{oc_actual}` actualizada correctamente en Supabase.")
+                    st.rerun()
+
+        st.markdown("---")
+        st.markdown("#### 🗑️ Zona de Peligro")
+        if st.button("⚠️ Eliminar esta Orden de Compra por Completo", key="btn_del_oc_main"):
+            if len(lista_ocs) > 1:
+                if eliminar_oc_supabase(oc_actual):
+                    st.success(f"🗑️ OC `{oc_actual}` eliminada por completo.")
+                    st.rerun()
+            else:
+                st.error("No puedes eliminar la última Orden de Compra registrada.")
+
     m1, m2, m3 = st.columns(3)
     m1.metric("OC Activa", oc_actual)
     m2.metric("Producidas / Meta", f"{piezas_producidas_oc} / {meta_actual}")
