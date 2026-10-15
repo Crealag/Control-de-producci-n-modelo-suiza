@@ -15,7 +15,7 @@ st.set_page_config(
     page_icon="🏢"
 )
 
-# --- CREDENCIALES DE LA NUBE ---
+# --- CREDENCIALES ---
 SUPABASE_URL = "https://jdihosehcvvzxsbhnqvf.supabase.co"
 SUPABASE_KEY = "sb_publishable_D79R2pyWt6LI3lggygrbjg_4oJmoEX_"
 
@@ -25,7 +25,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS con paleta Crealag
+# Estilos CSS
 st.markdown("""
     <style>
     .stApp { background-color: #0A0F1D; color: #F8FAFC; }
@@ -49,22 +49,33 @@ def cargar_catalogo_ocs():
             return pd.DataFrame(res.data)
     except Exception as e:
         st.error(f"Error al cargar catálogo: {e}")
-    return pd.DataFrame([{"orden_compra": "HC-0505", "meta_piezas": 100, "estado": "Activa", "piezas_entregadas": 0}])
+    return pd.DataFrame([{"orden_compra": "HC-0505", "meta_piezas": 1700, "estado": "Activa", "piezas_entregadas": 0}])
 
 def guardar_nueva_oc(orden, meta):
     try:
-        supabase.table("Órdenes_Compra").insert({"orden_compra": orden, "meta_piezas": int(meta), "estado": "Activa"}).execute()
+        supabase.table("Órdenes_Compra").insert({"orden_compra": orden, "meta_piezas": int(meta), "estado": "Activa", "piezas_entregadas": 0}).execute()
         return True
     except Exception as e:
         st.error(f"Error al guardar nueva OC: {e}")
         return False
 
-def actualizar_oc_supabase(orden, meta, estado):
+def actualizar_oc_supabase(orden, meta, estado, entregadas):
     try:
-        supabase.table("Órdenes_Compra").update({"meta_piezas": int(meta), "estado": estado}).eq("orden_compra", orden).execute()
+        supabase.table("Órdenes_Compra").update({"meta_piezas": int(meta), "estado": estado, "piezas_entregadas": int(entregadas)}).eq("orden_compra", orden).execute()
         return True
     except Exception as e:
         st.error(f"Error al actualizar la OC: {e}")
+        return False
+
+def registrar_entrega_piezas(orden, cantidad_entregada_nueva):
+    try:
+        res = supabase.table("Órdenes_Compra").select("piezas_entregadas").eq("orden_compra", orden).execute()
+        actuales = res.data[0]["piezas_entregadas"] if res.data and res.data[0]["piezas_entregadas"] is not None else 0
+        total_acumulado = actuales + int(cantidad_entregada_nueva)
+        supabase.table("Órdenes_Compra").update({"piezas_entregadas": total_acumulado}).eq("orden_compra", orden).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error al registrar entrega: {e}")
         return False
 
 def eliminar_oc_supabase(orden):
@@ -179,9 +190,10 @@ with st.sidebar:
     lista_ocs = df_ocs_catalogo["orden_compra"].tolist() if not df_ocs_catalogo.empty else ["HC-0505"]
     oc_actual = st.selectbox("Seleccionar OC Activa:", lista_ocs)
     
-    row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc[0] if not df_ocs_catalogo.empty and oc_actual in df_ocs_catalogo["orden_compra"].values else {"meta_piezas": 100, "estado": "Activa"}
-    meta_actual = int(row_oc_info.get("meta_piezas", 100))
+    row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc[0] if not df_ocs_catalogo.empty and oc_actual in df_ocs_catalogo["orden_compra"].values else {"meta_piezas": 1700, "estado": "Activa", "piezas_entregadas": 0}
+    meta_actual = int(row_oc_info.get("meta_piezas", 1700))
     estado_oc = str(row_oc_info.get("estado", "Activa"))
+    entregadas_actual = int(row_oc_info.get("piezas_entregadas", 0) if pd.notnull(row_oc_info.get("piezas_entregadas")) else 0)
     
     if estado_oc == "Cerrada":
         st.error(f"🔒 OC `{oc_actual}` CERRADA (Solo lectura)")
@@ -190,7 +202,7 @@ with st.sidebar:
 
     with st.expander("➕ Registrar Nueva Orden de Compra"):
         nueva_oc_input = st.text_input("Nueva OC (Ej. HER-101026)")
-        nueva_meta_input = st.number_input("Meta de piezas:", min_value=1, value=100, step=10)
+        nueva_meta_input = st.number_input("Meta de piezas:", min_value=1, value=1700, step=10)
         if st.button("Guardar Nueva OC"):
             if nueva_oc_input and nueva_oc_input not in lista_ocs:
                 if guardar_nueva_oc(nueva_oc_input, nueva_meta_input):
@@ -204,21 +216,23 @@ st.markdown("---")
 if menu_seleccionado == "📊 Producción y Registro":
     df_oc = df[df["orden_compra"] == oc_actual] if not df.empty else pd.DataFrame()
     piezas_producidas_oc = df_oc["piezas_producidas"].sum() if not df_oc.empty else 0
+    piezas_almacen_actual = max(0, piezas_producidas_oc - entregadas_actual)
     porcentaje = min(1.0, piezas_producidas_oc / meta_actual) if meta_actual > 0 else 0.0
 
     st.subheader(f"Panel de Control - Orden Activa: `{oc_actual}` ({estado_oc})")
     
-    # Opciones de administración de la OC activa directamente en la pantalla principal
-    with st.expander(f"⚙️ Configurar / Eliminar Orden `{oc_actual}`"):
+    # Configurar Meta, Estado y Entregas
+    with st.expander(f"⚙️ Configurar / Ajustar Orden `{oc_actual}`"):
         with st.form("form_edit_oc"):
-            st.markdown("#### Ajustar Meta y Estado de la Orden")
-            col_m1, col_m2 = st.columns(2)
+            st.markdown("#### Ajustar Datos de la Orden")
+            col_m1, col_m2, col_m3 = st.columns(3)
             meta_editada = col_m1.number_input("Meta de piezas:", min_value=1, value=meta_actual, step=10)
-            estado_editado = col_m2.selectbox("Estado de la OC:", ["Activa", "Cerrada"], index=0 if estado_oc == "Activa" else 1)
+            entregadas_editadas = col_m2.number_input("Piezas Entregadas:", min_value=0, value=entregadas_actual, step=1)
+            estado_editado = col_m3.selectbox("Estado de la OC:", ["Activa", "Cerrada"], index=0 if estado_oc == "Activa" else 1)
             
             btn_guardar_oc = st.form_submit_button("💾 Guardar Cambios en OC", type="primary")
             if btn_guardar_oc:
-                if actualizar_oc_supabase(oc_actual, meta_editada, estado_editado):
+                if actualizar_oc_supabase(oc_actual, meta_editada, estado_editado, entregadas_editadas):
                     st.success(f"✅ OC `{oc_actual}` actualizada correctamente.")
                     st.rerun()
 
@@ -232,16 +246,18 @@ if menu_seleccionado == "📊 Producción y Registro":
             else:
                 st.error("No puedes eliminar la última Orden de Compra registrada.")
 
-    m1, m2, m3 = st.columns(3)
-    m1.metric("OC Activa", oc_actual)
-    m2.metric("Producidas / Meta", f"{piezas_producidas_oc} / {meta_actual}")
-    m3.metric("Avance", f"{int(porcentaje * 100)}%")
+    # MÉTIRCAS EN PANTALLA OPERATIVA
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Meta Estimada OC", f"{meta_actual} pzas")
+    m2.metric("Producido Total", f"{piezas_producidas_oc} pzas")
+    m3.metric("Entregadas / Remitidas", f"{entregadas_actual} pzas")
+    m4.metric("Disponibles en Almacén", f"{piezas_almacen_actual} pzas")
     st.progress(porcentaje)
 
     st.markdown("---")
 
     if estado_oc != "Cerrada":
-        st.subheader("➕ Registrar Piezas")
+        st.subheader("➕ Registrar Piezas Producidas")
         tipo_captura = st.radio("Modo de registro:", ["Rápido / Actual", "Pasado (Fecha/Hora)"], horizontal=True)
         piezas_sumar = 0
         fecha_registro = datetime.now().strftime("%Y-%m-%d")
@@ -299,8 +315,9 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
     st.subheader("Generador de Remisiones Oficiales - Formato Original Crealag")
     df_oc_rem = df[df["orden_compra"] == oc_actual] if not df.empty else pd.DataFrame()
     piezas_producidas_total = df_oc_rem["piezas_producidas"].sum() if not df_oc_rem.empty else 0
+    piezas_almacen_rem = max(0, piezas_producidas_total - entregadas_actual)
     
-    st.info(f"📦 **Estado de Almacén para `{oc_actual}`:** Total Producido: **{piezas_producidas_total} piezas**.")
+    st.info(f"📦 **Estado de Almacén para `{oc_actual}`:** Total Producido: **{piezas_producidas_total} pzas** | Ya Entregadas: **{entregadas_actual} pzas** | Disponibles: **{piezas_almacen_rem} pzas**")
 
     with st.form("form_remision"):
         col1, col2 = st.columns(2)
@@ -313,12 +330,15 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
         with col2:
             referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
             fecha_remision = st.date_input("Fecha de emisión", datetime.now())
-            cantidad_piezas = st.number_input("Cantidad de piezas a entregar", min_value=1, value=max(1, int(piezas_producidas_total)))
+            cantidad_piezas_entrega = st.number_input("Cantidad de piezas a entregar en esta remisión", min_value=1, value=max(1, int(piezas_almacen_rem)))
 
         fecha_recibido_str = st.text_input("Fecha de pedido recibido (Texto)", "08 de mayo de 2026")
-        submit_pdf = st.form_submit_button("Generar PDF de Remisión Original")
+        sumar_a_entregadas = st.checkbox(" Descontar estas piezas de Almacén al generar remisión", value=True)
+        submit_pdf = st.form_submit_button("Generar PDF de Remisión Original", type="primary")
 
     if submit_pdf:
-        pdf_buffer = generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_actual, fecha_remision, cantidad_piezas, fecha_recibido_str)
-        st.success("¡Remisión generada con éxito!")
+        if sumar_a_entregadas:
+            registrar_entrega_piezas(oc_actual, cantidad_piezas_entrega)
+        pdf_buffer = generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_actual, fecha_remision, cantidad_piezas_entrega, fecha_recibido_str)
+        st.success(f"¡Remisión por {cantidad_piezas_entrega} piezas generada con éxito y descontada del almacén!")
         st.download_button(label="📥 Descargar Remisión en PDF", data=pdf_buffer, file_name="Remision.pdf", mime="application/pdf")
