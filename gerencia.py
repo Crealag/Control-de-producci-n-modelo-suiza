@@ -9,7 +9,7 @@ st.set_page_config(
     page_icon="🏢"
 )
 
-# --- CREDENCIALES DE SUPABASE ---
+# --- CREDENCIALES ---
 SUPABASE_URL = "https://jdihosehcvvzxsbhnqvf.supabase.co"
 SUPABASE_KEY = "sb_publishable_D79R2pyWt6LI3lggygrbjg_4oJmoEX_"
 
@@ -52,7 +52,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- CARGAR CATÁLOGO DE ÓRDENES Y PRODUCCIÓN DESDE SUPABASE ---
+# --- CARGAR CATÁLOGO DE ÓRDENES Y PRODUCCIÓN ---
 def cargar_catalogo_ocs():
     try:
         res = supabase.table("Órdenes_Compra").select("*").execute()
@@ -77,14 +77,12 @@ def cargar_datos_supabase():
 df_ocs_catalogo = cargar_catalogo_ocs()
 df_produccion = cargar_datos_supabase()
 
-# Obtener la lista estricta de órdenes oficiales desde el catálogo en la nube
 lista_ocs = df_ocs_catalogo["orden_compra"].tolist() if not df_ocs_catalogo.empty else []
 
-# Inicializar el estado de la sesión para controlar la orden seleccionada
 if "orden_seleccionada" not in st.session_state:
     st.session_state.orden_seleccionada = None
 
-# --- BARRA LATERAL (SISTEMA DE SUPERVISIÓN) ---
+# --- BARRA LATERAL ---
 with st.sidebar:
     st.markdown("<h2 class='brand-title' style='color: #D4AF37; margin-bottom: 0px;'>crealag</h2>", unsafe_allow_html=True)
     st.caption("Sistema de Supervisión")
@@ -96,24 +94,19 @@ with st.sidebar:
         if st.button("🔄 Cambiar de Orden de Compra", use_container_width=True):
             st.session_state.orden_seleccionada = None
             st.rerun()
-            
-    st.markdown("---")
-    st.info("ℹ️ Este panel muestra el estado actual de la producción sincronizado en tiempo real.")
 
-# --- PANTALLA 1: BIENVENIDA Y SELECCIÓN INICIAL ---
+# --- PANTALLA 1: BIENVENIDA ---
 if st.session_state.orden_seleccionada is None:
     st.markdown("<br><br>", unsafe_allow_html=True)
-    
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("""
             <div class="welcome-card">
                 <h1 class="brand-title" style="color: #D4AF37; font-size: 36px; margin-bottom: 10px;">crealag</h1>
                 <h3 style="color: #F8FAFC; font-weight: 400; margin-bottom: 20px;">Sistema de Supervisión</h3>
-                <p style="color: #94A3B8; font-size: 15px;">Bienvenido al portal de control. Por favor, seleccione la Orden de Compra que desea monitorear para visualizar los datos en tiempo real.</p>
+                <p style="color: #94A3B8; font-size: 15px;">Seleccione la Orden de Compra que desea monitorear en tiempo real.</p>
             </div>
         """, unsafe_allow_html=True)
-        
         st.markdown("<br>", unsafe_allow_html=True)
         
         if lista_ocs:
@@ -121,39 +114,33 @@ if st.session_state.orden_seleccionada is None:
                 oc_elegida = st.selectbox("Seleccione una Orden de Compra:", lista_ocs)
                 st.markdown("<br>", unsafe_allow_html=True)
                 btn_continuar = st.form_submit_button("Consultar Orden de Compra", use_container_width=True, type="primary")
-                
             if btn_continuar:
                 st.session_state.orden_seleccionada = oc_elegida
                 st.rerun()
         else:
             st.warning("No hay Órdenes de Compra activas en el sistema.")
 
-# --- PANTALLA 2: VISUALIZACIÓN DE DATOS DE LA ORDEN SELECCIONADA ---
+# --- PANTALLA 2: DATOS EN TIEMPO REAL ---
 else:
     oc_actual = st.session_state.orden_seleccionada
     
-    # Título principal
     st.markdown(f"<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Orden de Compra: <b>{oc_actual}</b></span></h1>", unsafe_allow_html=True)
     st.markdown("---")
 
-    # Extraer meta y estado directamente de la tabla de Supabase
     row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc[0] if not df_ocs_catalogo.empty and oc_actual in df_ocs_catalogo["orden_compra"].values else {"meta_piezas": 100, "estado": "Activa", "piezas_entregadas": 0}
     meta_oc = int(row_oc_info.get("meta_piezas", 100))
     estado_oc = str(row_oc_info.get("estado", "Activa"))
 
-    # Filtrar registros de producción de la OC seleccionada
     df_oc_prod = df_produccion[df_produccion["orden_compra"] == oc_actual] if not df_produccion.empty and "orden_compra" in df_produccion.columns else pd.DataFrame()
     total_producido = int(df_oc_prod["piezas_producidas"].sum()) if not df_oc_prod.empty else 0
     piezas_entregadas = int(row_oc_info.get("piezas_entregadas", 0))
     piezas_almacen = max(0, total_producido - piezas_entregadas)
 
-    # Estado de la orden
     if total_producido >= meta_oc:
         st.success(f"🟢 **ESTADO DE LA ORDEN:** ¡TERMINADA! Se alcanzó o superó la meta de {meta_oc} piezas.")
     else:
         st.warning(f"🟡 **ESTADO DE LA ORDEN:** EN PROCESO (Faltan {max(0, meta_oc - total_producido)} piezas para completar la meta estimada).")
 
-    # Métricas claras en pantalla grande
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Meta Estimada OC", f"{meta_oc} pzas")
     m2.metric("Producido Total", f"{total_producido} pzas")
@@ -165,18 +152,33 @@ else:
 
     st.markdown("---")
 
-    # HISTORIAL DE REGISTROS
-    st.markdown(f"### 📑 Historial de Fabricación - `{oc_actual}`")
+    # --- CALENDARIO INTERACTIVO DE PRODUCCIÓN DIARIA ---
+    st.markdown(f"### 📅 Calendario de Producción Diaria - `{oc_actual}`")
+    
     if not df_oc_prod.empty:
-        df_mostrar = df_oc_prod.sort_values(by="id", ascending=False)[["fecha", "hora", "piezas_producidas", "observaciones_turno"]]
-        df_mostrar.columns = ["Fecha", "Hora", "Piezas Producidas", "Observaciones del Turno"]
-        st.dataframe(df_mostrar, use_container_width=True)
+        # Agrupar piezas producidas por día (sin mostrar horas ni observaciones)
+        df_diario = df_oc_prod.groupby("fecha", as_index=False)["piezas_producidas"].sum()
+        df_diario = df_diario.sort_values(by="fecha", ascending=False)
         
-        csv_reporte_gen = df_oc_prod.to_csv(index=False).encode('utf-8')
+        # Mostrar gráfica de barras interactiva (sirve como calendario visual táctil y con cursor)
+        st.markdown("<p style='color: #94A3B8; font-size: 14px;'>Pasa el cursor o toca las barras para ver el total de piezas fabricadas por fecha:</p>", unsafe_allow_html=True)
+        
+        df_chart = df_diario.set_index("fecha")
+        st.bar_chart(df_chart["piezas_producidas"], color="#D4AF37")
+        
+        st.markdown("---")
+        st.markdown("#### 📋 Resumen por Día")
+        
+        # Tabla limpia solo con Fecha y Piezas Producidas
+        df_tabla_limpia = df_diario.copy()
+        df_tabla_limpia.columns = ["Fecha", "Piezas Producidas"]
+        st.dataframe(df_tabla_limpia, use_container_width=True, hide_index=True)
+        
+        csv_reporte_gen = df_tabla_limpia.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Descargar Reporte de esta Orden (CSV)",
+            label="📥 Descargar Reporte Diario (CSV)",
             data=csv_reporte_gen,
-            file_name=f"Reporte_Gerencial_{oc_actual}.csv",
+            file_name=f"Reporte_Diario_{oc_actual}.csv",
             mime="text/csv"
         )
     else:
