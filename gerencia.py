@@ -21,7 +21,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS con paleta Crealag y diseño de Calendario Visual
+# Estilos CSS con paleta Crealag
 st.markdown("""
     <style>
     .stApp {
@@ -50,58 +50,6 @@ st.markdown("""
         text-align: center;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         margin-top: 30px;
-    }
-    /* Estilos para el Calendario Visual */
-    .calendar-container {
-        background-color: #111B2E;
-        border: 1px solid #2D3E5E;
-        border-radius: 10px;
-        padding: 20px;
-        margin-top: 15px;
-    }
-    .calendar-grid {
-        display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        gap: 8px;
-        text-align: center;
-    }
-    .calendar-header-day {
-        font-weight: bold;
-        color: #94A3B8;
-        padding: 8px 0;
-        font-size: 13px;
-    }
-    .calendar-day {
-        background-color: #1A263D;
-        border-radius: 8px;
-        min-height: 75px;
-        padding: 8px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        border: 1px solid #2D3E5E;
-    }
-    .calendar-day-active {
-        background-color: rgba(212, 175, 55, 0.15);
-        border: 1px solid #D4AF37;
-    }
-    .day-number {
-        font-size: 14px;
-        font-weight: bold;
-        color: #F8FAFC;
-    }
-    .day-badge {
-        background-color: #D4AF37;
-        color: #0A0F1D;
-        font-size: 11px;
-        font-weight: bold;
-        padding: 2px 4px;
-        border-radius: 4px;
-        margin-top: 4px;
-    }
-    .day-empty {
-        background-color: transparent;
-        border: none;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -174,7 +122,7 @@ if st.session_state.orden_seleccionada is None:
         else:
             st.warning("No hay Órdenes de Compra activas en el sistema.")
 
-# --- PANTALLA 2: DATOS EN TIEMPO REAL CON CALENDARIO VISUAL ---
+# --- PANTALLA 2: DATOS EN TIEMPO REAL CON CALENDARIO NATIVO ---
 else:
     oc_actual = st.session_state.orden_seleccionada
     
@@ -206,7 +154,7 @@ else:
 
     st.markdown("---")
 
-    # --- CALENDARIO VISUAL INTERACTIVO ---
+    # --- CALENDARIO VISUAL NATIVO CON COLUMNAS ---
     st.markdown(f"### 📅 Calendario de Producción - `{oc_actual}`")
 
     if not df_oc_prod.empty:
@@ -224,43 +172,48 @@ else:
                              7: "Julio", 8: "Agosto", 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"}
             mes_sel = st.selectbox("Mes:", options=list(meses_nombres.keys()), format_func=lambda x: meses_nombres[x], index=min_fecha.month - 1 if min_fecha.year == anio_sel else 0)
 
-        cal = calendar.Calendar(firstweekday=0)
-        dias_mes = cal.monthdayscalendar(anio_sel, mes_sel)
-        
-        nombres_dias = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
-        
-        html_grid = "<div class='calendar-container'><div class='calendar-grid'>"
-        for d in nombres_dias:
-            html_grid += f"<div class='calendar-header-day'>{d}</div>"
-            
-        for semana in dias_mes:
-            for dia in semana:
-                if dia == 0:
-                    html_grid += "<div class='calendar-day day-empty'></div>"
-                else:
-                    fecha_actual_obj = date(anio_sel, mes_sel, dia)
-                    piezas_dia = df_diario.get(fecha_actual_obj, 0)
-                    
-                    if piezas_dia > 0:
-                        html_grid += f"""
-                        <div class='calendar-day calendar-day-active' title='{fecha_actual_obj}: {piezas_dia} piezas'>
-                            <span class='day-number'>{dia}</span>
-                            <span class='day-badge'>⚡ {piezas_dia} pzas</span>
-                        </div>
-                        """
-                    else:
-                        html_grid += f"""
-                        <div class='calendar-day'>
-                            <span class='day-number'>{dia}</span>
-                        </div>
-                        """
-        html_grid += "</div></div>"
-        
-        st.markdown(html_grid, unsafe_allow_html=True)
+        # Renderizado de Encabezados de Días (Lun a Dom)
+        cols_header = st.columns(7)
+        dias_semana_nombres = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+        for idx, d_nombre in enumerate(dias_semana_nombres):
+            cols_header[idx].markdown(f"**<div style='text-align: center; color: #94A3B8;'>{d_nombre}</div>**", unsafe_allow_html=True)
+
         st.markdown("<br>", unsafe_allow_html=True)
 
-        st.markdown("#### 🔍 Detalle por Fecha")
-        fecha_elegida_detalle = st.date_input("Selecciona una fecha para ver piezas registradas:", value=min_fecha)
+        # Construcción del Calendario en cuadrícula de columnas nativas
+        cal = calendar.Calendar(firstweekday=0)
+        dias_mes = cal.monthdayscalendar(anio_sel, mes_sel)
+
+        for semana in dias_mes:
+            cols_semana = st.columns(7)
+            for idx, dia in enumerate(semana):
+                with cols_semana[idx]:
+                    if dia == 0:
+                        st.write("") # Día vacío fuera del mes
+                    else:
+                        fecha_curr = date(anio_sel, mes_sel, dia)
+                        pzas = df_diario.get(fecha_curr, 0)
+                        
+                        if pzas > 0:
+                            # Tarjeta de día con producción activa
+                            st.markdown(f"""
+                                <div style="background-color: rgba(212, 175, 55, 0.15); border: 1px solid #D4AF37; border-radius: 8px; padding: 10px; text-align: center;">
+                                    <div style="font-size: 16px; font-weight: bold; color: #F8FAFC;">{dia}</div>
+                                    <div style="background-color: #D4AF37; color: #0A0F1D; font-size: 11px; font-weight: bold; border-radius: 4px; padding: 2px 4px; margin-top: 4px;">⚡ {pzas} pzas</div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        else:
+                            # Día normal sin registros
+                            st.markdown(f"""
+                                <div style="background-color: #1A263D; border: 1px solid #2D3E5E; border-radius: 8px; padding: 10px; text-align: center;">
+                                    <div style="font-size: 16px; font-weight: bold; color: #64748B;">{dia}</div>
+                                    <div style="font-size: 11px; color: #475569; margin-top: 4px;">-</div>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown("#### 🔍 Consultar Detalle Completo")
+        fecha_elegida_detalle = st.date_input("Selecciona una fecha:", value=min_fecha)
         
         df_detalle_dia = df_oc_prod[df_oc_prod['fecha_dt'].dt.date == fecha_elegida_detalle]
         if not df_detalle_dia.empty:
