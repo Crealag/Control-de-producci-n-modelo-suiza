@@ -148,7 +148,8 @@ def generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_
     story.append(t_campos)
     story.append(Spacer(1, 25))
     
-    texto_cuerpo = f"Referente a su pedido <b><u>{oc_actual}</u></b> recibido el <b><u>{fecha_recibido_str}</u></b>. Se hace entrega de <b><u>{cantidad_piezas}</u></b> piezas de respaldo de silla modelo Suiza."
+    # Modelo Suiza en negritas y subrayado
+    texto_cuerpo = f"Referente a su pedido <b><u>{oc_actual}</u></b> recibido el <b><u>{fecha_recibido_str}</u></b>. Se hace entrega de <b><u>{cantidad_piezas}</u></b> piezas de respaldo de silla <b><u>modelo Suiza</u></b>."
     style_cuerpo = ParagraphStyle('CuerpoRemision', fontName='Helvetica', fontSize=10.5, leading=16, textColor=colors.HexColor('#0F172A'))
     story.append(Paragraph(texto_cuerpo, style_cuerpo))
     story.append(Spacer(1, 260))
@@ -221,7 +222,6 @@ if menu_seleccionado == "📊 Producción y Registro":
 
     st.subheader(f"Panel de Control - Orden Activa: `{oc_actual}` ({estado_oc})")
     
-    # Configurar Meta, Estado y Entregas
     with st.expander(f"⚙️ Configurar / Ajustar Orden `{oc_actual}`"):
         with st.form("form_edit_oc"):
             st.markdown("#### Ajustar Datos de la Orden")
@@ -246,7 +246,6 @@ if menu_seleccionado == "📊 Producción y Registro":
             else:
                 st.error("No puedes eliminar la última Orden de Compra registrada.")
 
-    # MÉTIRCAS EN PANTALLA OPERATIVA
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Meta Estimada OC", f"{meta_actual} pzas")
     m2.metric("Producido Total", f"{piezas_producidas_oc} pzas")
