@@ -21,7 +21,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS - Paleta Clara / Fondo Blanco con Controles Sobrios y Elegantes
+# Estilos CSS - Paleta Clara / Fondo Blanco con botones corporativos y selectores limpios
 st.markdown("""
     <style>
     /* Fondo global blanco suave */
@@ -41,7 +41,7 @@ st.markdown("""
         color: #0F172A !important;
     }
     
-    /* Menús desplegables / Selects en tema claro sobrio */
+    /* Menús desplegables / Selects en tema claro */
     div[data-baseweb="select"] > div {
         background-color: #FFFFFF !important;
         color: #0F172A !important;
@@ -53,17 +53,17 @@ st.markdown("""
         color: #0F172A !important;
     }
     
-    /* Botones sobrios sin colores fosforescentes (gris oscuro corporativo) */
-    .stButton>button, button[kind="primary"], div.stButton > button {
+    /* Forzar color sobrio en TODOS los botones (incluyendo el primario rojo de Streamlit) */
+    button, .stButton > button, [data-testid="baseButton-primary"] {
         background-color: #1E293B !important;
+        background-image: none !important;
         color: #FFFFFF !important;
         border: 1px solid #1E293B !important;
         border-radius: 8px !important;
         font-weight: 600 !important;
         padding: 8px 16px !important;
-        transition: all 0.2s ease !important;
     }
-    .stButton>button:hover, button[kind="primary"]:hover, div.stButton > button:hover {
+    button:hover, .stButton > button:hover, [data-testid="baseButton-primary"]:hover {
         background-color: #0F172A !important;
         border-color: #0F172A !important;
         color: #FFFFFF !important;
