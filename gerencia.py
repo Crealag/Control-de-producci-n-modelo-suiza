@@ -4,7 +4,7 @@ from datetime import datetime, date
 import calendar
 from supabase import create_client
 
-# Configuración de la página con la identidad corporativa de Crealag (Sistema de Supervisión)
+# Configuración de la página
 st.set_page_config(
     page_title="crealag - Sistema de Supervisión", 
     layout="wide", 
@@ -21,34 +21,56 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS con paleta Crealag
+# Estilos CSS - Tema Claro Corporativo
 st.markdown("""
     <style>
-    .stApp {
-        background-color: #0A0F1D;
-        color: #F8FAFC;
+    /* Fondo principal e interfaz global */
+    .stApp, [data-testid="stHeader"], [data-testid="stToolbar"] {
+        background-color: #F8FAFC !important;
+        color: #0F172A !important;
     }
+    /* Barra lateral */
     [data-testid="stSidebar"] {
-        background-color: #111B2E;
+        background-color: #FFFFFF !important;
+        border-right: 1px solid #E2E8F0 !important;
     }
-    div[data-baseweb="select"] {
-        background-color: #1A263D !important;
-        color: #F8FAFC !important;
-        border-color: #2D3E5E !important;
+    /* Tipografía y textos */
+    h1, h2, h3, h4, h5, h6, p, span, label, div, .stMarkdown {
+        color: #0F172A !important;
     }
+    /* Menús desplegables / Selects */
+    div[data-baseweb="select"] > div {
+        background-color: #FFFFFF !important;
+        color: #0F172A !important;
+        border: 1px solid #CBD5E1 !important;
+    }
+    [data-baseweb="popover"], [data-baseweb="menu"] {
+        background-color: #FFFFFF !important;
+        color: #0F172A !important;
+    }
+    /* Métricas */
+    [data-testid="stMetricValue"] {
+        color: #0F172A !important;
+        font-weight: 700 !important;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #475569 !important;
+    }
+    /* Título de Marca Crealag */
     .brand-title {
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
         font-weight: 800;
         letter-spacing: -1px;
-        color: #F8FAFC;
+        color: #0F172A !important;
     }
+    /* Tarjeta de bienvenida */
     .welcome-card {
-        background: linear-gradient(135deg, #111B2E 0%, #1A263D 100%);
-        border: 1px solid #2D3E5E;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
         border-radius: 12px;
         padding: 40px;
         text-align: center;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         margin-top: 30px;
     }
     </style>
@@ -86,7 +108,7 @@ if "orden_seleccionada" not in st.session_state:
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    st.markdown("<h2 class='brand-title' style='color: #D4AF37; margin-bottom: 0px;'>crealag</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='brand-title' style='color: #B45309 !important; margin-bottom: 0px;'>crealag</h2>", unsafe_allow_html=True)
     st.caption("Sistema de Supervisión")
     st.markdown("---")
     st.success("🔒 **Solo Lectura**")
@@ -104,9 +126,9 @@ if st.session_state.orden_seleccionada is None:
     with col2:
         st.markdown("""
             <div class="welcome-card">
-                <h1 class="brand-title" style="color: #D4AF37; font-size: 36px; margin-bottom: 10px;">crealag</h1>
-                <h3 style="color: #F8FAFC; font-weight: 400; margin-bottom: 20px;">Sistema de Supervisión</h3>
-                <p style="color: #94A3B8; font-size: 15px;">Seleccione la Orden de Compra que desea monitorear en tiempo real.</p>
+                <h1 class="brand-title" style="color: #B45309 !important; font-size: 36px; margin-bottom: 10px;">crealag</h1>
+                <h3 style="color: #1E293B !important; font-weight: 500; margin-bottom: 20px;">Sistema de Supervisión</h3>
+                <p style="color: #64748B !important; font-size: 15px;">Seleccione la Orden de Compra que desea monitorear en tiempo real.</p>
             </div>
         """, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
@@ -122,11 +144,11 @@ if st.session_state.orden_seleccionada is None:
         else:
             st.warning("No hay Órdenes de Compra activas en el sistema.")
 
-# --- PANTALLA 2: DATOS EN TIEMPO REAL Y CALENDARIO ---
+# --- PANTALLA 2: DATOS EN TIEMPO REAL Y CALENDARIO CLARO ---
 else:
     oc_actual = st.session_state.orden_seleccionada
     
-    st.markdown(f"<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Orden de Compra: <b>{oc_actual}</b></span></h1>", unsafe_allow_html=True)
+    st.markdown(f"<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #64748B !important;'>| Orden de Compra: <b>{oc_actual}</b></span></h1>", unsafe_allow_html=True)
     st.markdown("---")
 
     row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc[0] if not df_ocs_catalogo.empty and oc_actual in df_ocs_catalogo["orden_compra"].values else {"meta_piezas": 1700, "estado": "Activa", "piezas_entregadas": 0}
@@ -154,7 +176,7 @@ else:
 
     st.markdown("---")
 
-    # --- CALENDARIO VISUAL ---
+    # --- CALENDARIO VISUAL CLARO ---
     st.markdown(f"### 📅 Calendario de Producción - `{oc_actual}`")
 
     if not df_oc_prod.empty:
@@ -175,7 +197,7 @@ else:
         cols_header = st.columns(7)
         dias_semana_nombres = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
         for idx, d_nombre in enumerate(dias_semana_nombres):
-            cols_header[idx].markdown(f"**<div style='text-align: center; color: #94A3B8;'>{d_nombre}</div>**", unsafe_allow_html=True)
+            cols_header[idx].markdown(f"**<div style='text-align: center; color: #475569 !important;'>{d_nombre}</div>**", unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
 
@@ -193,17 +215,19 @@ else:
                         pzas = df_diario.get(fecha_curr, 0)
                         
                         if pzas > 0:
+                            # Tarjeta para días con producción (Fondo ámbar/dorado suave con texto oscuro)
                             st.markdown(f"""
-                                <div style="background-color: rgba(212, 175, 55, 0.15); border: 1px solid #D4AF37; border-radius: 8px; padding: 10px; text-align: center;">
-                                    <div style="font-size: 16px; font-weight: bold; color: #F8FAFC;">{dia}</div>
-                                    <div style="background-color: #D4AF37; color: #0A0F1D; font-size: 11px; font-weight: bold; border-radius: 4px; padding: 2px 4px; margin-top: 4px;">⚡ {pzas} pzas</div>
+                                <div style="background-color: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px; padding: 10px; text-align: center;">
+                                    <div style="font-size: 16px; font-weight: bold; color: #78350F !important;">{dia}</div>
+                                    <div style="background-color: #F59E0B; color: #FFFFFF !important; font-size: 11px; font-weight: bold; border-radius: 4px; padding: 2px 4px; margin-top: 4px;">⚡ {pzas} pzas</div>
                                 </div>
                             """, unsafe_allow_html=True)
                         else:
+                            # Tarjeta para días sin producción (Blanca con borde gris sutil)
                             st.markdown(f"""
-                                <div style="background-color: #1A263D; border: 1px solid #2D3E5E; border-radius: 8px; padding: 10px; text-align: center;">
-                                    <div style="font-size: 16px; font-weight: bold; color: #64748B;">{dia}</div>
-                                    <div style="font-size: 11px; color: #475569; margin-top: 4px;">-</div>
+                                <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px; text-align: center;">
+                                    <div style="font-size: 16px; font-weight: bold; color: #94A3B8 !important;">{dia}</div>
+                                    <div style="font-size: 11px; color: #CBD5E1 !important; margin-top: 4px;">-</div>
                                 </div>
                             """, unsafe_allow_html=True)
 
