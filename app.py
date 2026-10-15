@@ -146,8 +146,16 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    st.header("📦 Órdenes de Compra")
     
+    # Encabezado de Órdenes de Compra con botón de 3 puntos (popover) integrado al lado
+    col_oc_title, col_oc_btn = st.columns([4, 1])
+    with col_oc_title:
+        st.header("📦 Órdenes")
+    with col_oc_btn:
+        with st.popover("⋮"):
+            st.markdown("### Opciones de OC")
+            accion_oc = st.radio("Acción:", ["Editar Meta/Estado", "Eliminar OC Actual"], key="menu_3_puntos_oc")
+
     lista_ocs = df_ocs_catalogo["Orden_Compra"].tolist()
     oc_actual = st.selectbox("Seleccionar OC Activa:", lista_ocs)
     
@@ -159,11 +167,30 @@ with st.sidebar:
         st.error(f"🔒 OC `{oc_actual}` CERRADA (Solo lectura)")
     else:
         st.success(f"🟢 OC `{oc_actual}` Activa")
-        if st.button("🔒 Cerrar Orden Actual"):
-            df_ocs_catalogo.loc[df_ocs_catalogo["Orden_Compra"] == oc_actual, "Estado"] = "Cerrada"
-            guardar_catalogo_ocs(df_ocs_catalogo)
-            st.success(f"La OC `{oc_actual}` ha sido cerrada.")
-            st.rerun()
+
+    # Acciones desplegadas desde el menú de 3 puntos
+    if accion_oc == "Editar Meta/Estado":
+        with st.expander("✏️ Configurar Orden Actual", expanded=True):
+            meta_editada = st.number_input("Meta de piezas:", min_value=1, value=meta_actual, step=10, key="edit_meta_input")
+            estado_editado = st.selectbox("Estado de la OC:", ["Activa", "Cerrada"], index=0 if estado_oc == "Activa" else 1, key="edit_estado_input")
+            
+            if st.button("Guardar Cambios OC"):
+                df_ocs_catalogo.loc[df_ocs_catalogo["Orden_Compra"] == oc_actual, "Meta_Piezas"] = meta_editada
+                df_ocs_catalogo.loc[df_ocs_catalogo["Orden_Compra"] == oc_actual, "Estado"] = estado_editado
+                guardar_catalogo_ocs(df_ocs_catalogo)
+                st.success(f"✅ OC `{oc_actual}` actualizada.")
+                st.rerun()
+    elif accion_oc == "Eliminar OC Actual":
+        with st.expander("🗑️ Zona de Peligro", expanded=True):
+            st.warning(f"¿Estás seguro de eliminar la OC `{oc_actual}` del catálogo?")
+            if st.button("⚠️ Confirmar Eliminación de OC", type="primary"):
+                if len(df_ocs_catalogo) > 1:
+                    df_ocs_catalogo = df_ocs_catalogo[df_ocs_catalogo["Orden_Compra"] != oc_actual]
+                    guardar_catalogo_ocs(df_ocs_catalogo)
+                    st.success(f"🗑️ OC `{oc_actual}` eliminada.")
+                    st.rerun()
+                else:
+                    st.error("No puedes eliminar la última Orden de Compra del sistema.")
 
     with st.expander("➕ Registrar Nueva Orden de Compra"):
         nueva_oc_input = st.text_input("Nueva OC (Ej. HER-101026)")
@@ -178,17 +205,6 @@ with st.sidebar:
                 st.rerun()
             elif nueva_oc_input in lista_ocs:
                 st.warning("Esta Orden de Compra ya existe en el catálogo.")
-
-    with st.expander("✏️ Editar Meta u Orden Existente"):
-        meta_editada = st.number_input("Editar meta de la OC actual:", min_value=1, value=meta_actual, step=10, key="edit_meta_input")
-        estado_editado = st.selectbox("Estado de la OC:", ["Activa", "Cerrada"], index=0 if estado_oc == "Activa" else 1, key="edit_estado_input")
-        
-        if st.button("Actualizar OC Actual"):
-            df_ocs_catalogo.loc[df_ocs_catalogo["Orden_Compra"] == oc_actual, "Meta_Piezas"] = meta_editada
-            df_ocs_catalogo.loc[df_ocs_catalogo["Orden_Compra"] == oc_actual, "Estado"] = estado_editado
-            guardar_catalogo_ocs(df_ocs_catalogo)
-            st.success(f"✅ OC `{oc_actual}` actualizada correctamente.")
-            st.rerun()
 
 # Título principal
 st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Control de Producción y Remisiones</span></h1>", unsafe_allow_html=True)
@@ -411,88 +427,3 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
                 [Paragraph("<b>Email:</b>", style_label), Paragraph(email, style_val)],
                 [Paragraph("<b>Cel:</b>", style_label), Paragraph(cel, style_val)],
                 [Paragraph("<b>Referencia:</b>", style_label), Paragraph(referencia, style_val)],
-                [Paragraph("<b>Documento:</b>", style_label), Paragraph("FTO:2026-REM-1", style_val)],
-                [Paragraph("<b>Referencia cliente:</b>", style_label), Paragraph(oc_actual, style_val)],
-                [Paragraph("<b>Fecha:</b>", style_label), Paragraph(fecha_remision.strftime('%d / %m / %Y'), style_val)],
-            ]
-            
-            t_campos = Table(data_campos, colWidths=[130, 380])
-            t_campos.setStyle(TableStyle([
-                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 3),
-                ('TOPPADDING', (0,0), (-1,-1), 3),
-            ]))
-            story.append(t_campos)
-            story.append(Spacer(1, 25))
-            
-            # 3. TEXTO OFICIAL
-            texto_cuerpo = f"Referente a su pedido {oc_actual} recibido el {fecha_recibido_str}. Se hace entrega de {cantidad_piezas} piezas de respaldo de silla modelo Suiza."
-            style_cuerpo = ParagraphStyle('CuerpoRemision', fontName='Helvetica', fontSize=10.5, leading=16, textColor=colors.HexColor('#0F172A'))
-            story.append(Paragraph(texto_cuerpo, style_cuerpo))
-            
-            # Espacio amplio para separar el texto de las firmas
-            story.append(Spacer(1, 260))
-            
-            # 5. LÍNEAS DE FIRMA CON TEXTO CENTRADO
-            style_firma_texto = ParagraphStyle('FirmaTexto', fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#0F172A'), alignment=1)
-            
-            data_firmas = [
-                [Paragraph("____________________________________________", style_normal), Paragraph("____________________________________________", style_normal)],
-                [Paragraph("ENTREGA", style_firma_texto), Paragraph("NOMBRE Y FIRMA RECIBE", style_firma_texto)]
-            ]
-            t_firmas = Table(data_firmas, colWidths=[270, 270])
-            t_firmas.setStyle(TableStyle([
-                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                ('VALIGN', (0,0), (-1,-1), 'TOP'),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 2),
-                ('TOPPADDING', (0,0), (-1,-1), 2),
-            ]))
-            story.append(t_firmas)
-            
-            # Espacio para empujar el pie de página exactamente al fondo de la hoja
-            story.append(Spacer(1, 75))
-            
-            # 6. PIE DE PÁGINA OFICIAL
-            story.append(tabla_linea)
-            story.append(Spacer(1, 6))
-            
-            style_foot_val = ParagraphStyle('FootVal', fontName='Helvetica', fontSize=7.5, textColor=colors.HexColor('#0F172A'), leading=9)
-            
-            col_contacto = [
-                Paragraph("<b>Contacto:</b> contacto@crealag.mx", style_foot_val),
-                Paragraph("<b>Web:</b> crealag.com", style_foot_val),
-                Paragraph("<b>Tel:</b> +52 871 185 5001", style_foot_val),
-            ]
-            
-            col_direccion = [
-                Paragraph("<b>Crealag SA de CV</b>", style_foot_val),
-                Paragraph("Perif. Gomez Lerdo KM12 No. 0", style_foot_val),
-                Paragraph("Periferico C.P.35150 CD Lerdo Durango", style_foot_val),
-            ]
-            
-            col_folio = [
-                Paragraph("", style_foot_val),
-                Paragraph("", style_foot_val),
-                Paragraph("FTO:2026-REM-1", style_foot_val),
-            ]
-            
-            t_footer = Table([[col_contacto, col_direccion, col_folio]], colWidths=[180, 240, 100])
-            t_footer.setStyle(TableStyle([
-                ('VALIGN', (0,0), (-1,-1), 'TOP'),
-                ('ALIGN', (2,0), (2,-1), 'RIGHT'),
-            ]))
-            story.append(t_footer)
-            
-            doc.build(story)
-            buffer.seek(0)
-            return buffer
-
-        pdf_buffer = generar_pdf_original()
-        
-        st.success("¡Remisión con formato original Crealag generada con éxito!")
-        st.download_button(
-            label="📥 Descargar Remisión en PDF",
-            data=pdf_buffer,
-            file_name="Remision.pdf",
-            mime="application/pdf"
-        )
