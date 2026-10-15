@@ -113,6 +113,25 @@ def insertar_registro(orden, fecha, hora, piezas, observaciones):
         st.error(f"Error al guardar en la nube: {e}")
         return False
 
+def actualizar_registro_supabase(record_id, piezas, observaciones):
+    try:
+        supabase.table("Producción").update({
+            "piezas_producidas": int(piezas),
+            "observaciones_turno": observaciones
+        }).eq("id", record_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error al actualizar el registro: {e}")
+        return False
+
+def eliminar_registro_supabase(record_id):
+    try:
+        supabase.table("Producción").delete().eq("id", record_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error al eliminar el registro: {e}")
+        return False
+
 df = cargar_datos_supabase()
 
 # --- FUNCIÓN GENERADORA DE PDF ---
@@ -271,7 +290,7 @@ with st.sidebar:
         
         if st.button("Guardar Nueva OC"):
             if nueva_oc_input and nueva_oc_input not in lista_ocs:
-                nuevo_row = pd.DataFrame([{"Orden_Compra": [nueva_oc_input], "Meta_Piezas": [nueva_meta_input], "Estado": ["Activa"]}])
+                nuevo_row = pd.DataFrame([{"Orden_Compra": nueva_oc_input, "Meta_Piezas": nueva_meta_input, "Estado": "Activa"}])
                 df_ocs_catalogo = pd.concat([df_ocs_catalogo, nuevo_row], ignore_index=True)
                 guardar_catalogo_ocs(df_ocs_catalogo)
                 st.success(f"✅ OC `{nueva_oc_input}` registrada.")
@@ -352,94 +371,5 @@ if menu_seleccionado == "📊 Producción y Registro":
 
     st.markdown("---")
 
-    # HISTORIAL
-    st.subheader(f"📋 Historial en Nube - {oc_actual}")
-    if not df_oc.empty:
-        st.dataframe(df_oc.sort_values(by="id", ascending=False), use_container_width=True)
-        csv_reporte_gen = df_oc.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Descargar Reporte Parcial (CSV)",
-            data=csv_reporte_gen,
-            file_name=f"Remision_Reporte_{oc_actual}.csv",
-            mime="text/csv"
-        )
-    else:
-        st.info("Aún no hay registros en esta Orden de Compra en la base de datos.")
-
-    st.markdown("---")
-
-    # GRÁFICAS
-    st.subheader("📈 Gráficas de Rendimiento")
-    col_g1, col_g2 = st.columns(2)
-
-    with col_g1:
-        st.markdown("##### 🕒 Ritmo por Hora (8:00 AM - 6:00 PM)")
-        hoy_str = datetime.now().strftime("%Y-%m-%d")
-        df_hoy = df[df["fecha"] == hoy_str] if not df.empty and "fecha" in df.columns else pd.DataFrame()
-
-        if not df_hoy.empty:
-            df_h = df_hoy.copy()
-            df_h['Hora_Int'] = pd.to_datetime(df_h['hora'], format='%H:%M:%S', errors='coerce').dt.hour
-            df_h = df_h[(df_h['Hora_Int'] >= 8) & (df_h['Hora_Int'] <= 18) & (df_h['Hora_Int'] != 13)]
-            
-            if not df_h.empty:
-                df_h['Rango_Hora'] = df_h['Hora_Int'].apply(lambda x: f"{x:02d}:00 - {x+1:02d}:00")
-                df_por_hora = df_h.groupby('Rango_Hora')['piezas_producidas'].sum()
-                horas_jornada = [f"{h:02d}:00 - {h+1:02d}:00" for h in [8,9,10,11,12,14,15,16,17]]
-                df_por_hora = df_por_hora.reindex(horas_jornada, fill_value=0)
-                st.bar_chart(df_por_hora)
-            else:
-                st.info("💡 Sin registros en horario laboral hoy (excluyendo hora de comida 1-2 PM).")
-        else:
-            st.info("💡 Sin registros para el día de hoy.")
-
-    with col_g2:
-        st.markdown(f"##### 📅 Producción Acumulada por Día (`{oc_actual}`)")
-        if not df_oc.empty:
-            df_dias = df_oc.copy()
-            df_por_dia = df_dias.groupby('fecha')['piezas_producidas'].sum()
-            st.line_chart(df_por_dia)
-        else:
-            st.info("💡 Sin registros diarios en esta OC.")
-
-# --- SECCIÓN 2: GENERADOR DE REMISIONES ---
-elif menu_seleccionado == "📄 Generador de Remisiones":
-    st.subheader("Generador de Remisiones Oficiales - Formato Original Crealag")
-    
-    df_oc_rem = df[df["orden_compra"] == oc_actual] if not df.empty and "orden_compra" in df.columns else pd.DataFrame()
-    piezas_producidas_total = df_oc_rem["piezas_producidas"].sum() if not df_oc_rem.empty else 0
-    
-    st.info(f"📦 **Estado de Almacén para `{oc_actual}`:** Total Producido en Nube: **{piezas_producidas_total} piezas**.")
-
-    with st.form("form_remision"):
-        col1, col2 = st.columns(2)
-        with col1:
-            atencion = st.text_input("Atención", "Ing. Laura Zamora")
-            compania = st.text_input("Compañía", "Herwong")
-            puesto = st.text_input("Puesto", "Compras")
-            email = st.text_input("Email", "compras.herwong@gmail.com")
-            cel = st.text_input("Cel", "871-1442234")
-            
-        with col2:
-            referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
-            fecha_remision = st.date_input("Fecha de emisión", datetime.now())
-            cantidad_piezas = st.number_input("Cantidad de piezas a entregar", min_value=1, value=max(1, int(piezas_producidas_total)))
-
-        fecha_recibido_str = st.text_input("Fecha de pedido recibido (Texto)", "08 de mayo de 2026")
-
-        submit_pdf = st.form_submit_button("Generar PDF de Remisión Original")
-
-    if submit_pdf:
-        pdf_buffer = generar_pdf_original(
-            atencion, compania, puesto, email, cel, 
-            referencia, oc_actual, fecha_remision, 
-            cantidad_piezas, fecha_recibido_str
-        )
-        
-        st.success("¡Remisión con formato original Crealag generada con éxito!")
-        st.download_button(
-            label="📥 Descargar Remisión en PDF",
-            data=pdf_buffer,
-            file_name="Remision.pdf",
-            mime="application/pdf"
-        )
+    # HISTORIAL Y CORRECCIÓN (EDITAR / ELIMINAR)
+    st.subheader(f"📋 Historial y Edición en Nube - {oc_actual}")
