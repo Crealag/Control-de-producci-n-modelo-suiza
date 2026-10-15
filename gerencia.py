@@ -253,4 +253,13 @@ else:
                             """, unsafe_allow_html=True)
 
         st.markdown("<br><br>", unsafe_allow_html=True)
-        st.
+        st.markdown("---")
+        csv_reporte_gen = df_oc_prod.groupby('fecha', as_index=False)['piezas_producidas'].sum().to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Descargar Reporte Consolidado (CSV)",
+            data=csv_reporte_gen,
+            file_name=f"Reporte_Calendario_{oc_actual}.csv",
+            mime="text/csv"
+        )
+    else:
+        st.info("Aún no hay registros de producción para esta orden en la base de datos.")
