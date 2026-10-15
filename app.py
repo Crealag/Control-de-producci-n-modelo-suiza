@@ -15,7 +15,7 @@ st.set_page_config(
     page_icon="🏢"
 )
 
-# --- CREDENCIALES DE SUPABASE ---
+# --- CREDENCIALES DE LA NUBE ---
 SUPABASE_URL = "https://jdihosehcvvzxsbhnqvf.supabase.co"
 SUPABASE_KEY = "sb_publishable_D79R2pyWt6LI3lggygrbjg_4oJmoEX_"
 
@@ -41,7 +41,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNCIONES DE BASE DE DATOS (CATÁLOGO Y PRODUCCIÓN) ---
+# --- FUNCIONES DE BASE DE DATOS ---
 def cargar_catalogo_ocs():
     try:
         res = supabase.table("Órdenes_Compra").select("*").execute()
@@ -194,7 +194,7 @@ with st.sidebar:
         if st.button("Guardar Nueva OC"):
             if nueva_oc_input and nueva_oc_input not in lista_ocs:
                 if guardar_nueva_oc(nueva_oc_input, nueva_meta_input):
-                    st.success(f"✅ OC `{nueva_oc_input}` creada en la nube.")
+                    st.success(f"✅ OC `{nueva_oc_input}` registrada.")
                     st.rerun()
 
 # --- VISTA PRINCIPAL ---
@@ -211,7 +211,7 @@ if menu_seleccionado == "📊 Producción y Registro":
     # Opciones de administración de la OC activa directamente en la pantalla principal
     with st.expander(f"⚙️ Configurar / Eliminar Orden `{oc_actual}`"):
         with st.form("form_edit_oc"):
-            st.markdown("#### Ajustar Meta y Estado en Supabase")
+            st.markdown("#### Ajustar Meta y Estado de la Orden")
             col_m1, col_m2 = st.columns(2)
             meta_editada = col_m1.number_input("Meta de piezas:", min_value=1, value=meta_actual, step=10)
             estado_editado = col_m2.selectbox("Estado de la OC:", ["Activa", "Cerrada"], index=0 if estado_oc == "Activa" else 1)
@@ -219,7 +219,7 @@ if menu_seleccionado == "📊 Producción y Registro":
             btn_guardar_oc = st.form_submit_button("💾 Guardar Cambios en OC", type="primary")
             if btn_guardar_oc:
                 if actualizar_oc_supabase(oc_actual, meta_editada, estado_editado):
-                    st.success(f"✅ OC `{oc_actual}` actualizada correctamente en Supabase.")
+                    st.success(f"✅ OC `{oc_actual}` actualizada correctamente.")
                     st.rerun()
 
         st.markdown("---")
@@ -274,7 +274,7 @@ if menu_seleccionado == "📊 Producción y Registro":
             st.rerun()
 
     st.markdown("---")
-    st.subheader(f"📋 Historial en Nube - {oc_actual}")
+    st.subheader(f"📋 Historial de Producción - {oc_actual}")
     if not df_oc.empty:
         st.dataframe(df_oc.sort_values(by="id", ascending=False), use_container_width=True)
         with st.expander("✏️ Editar o Eliminar un Registro de Producción"):
