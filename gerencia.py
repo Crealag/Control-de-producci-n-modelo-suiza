@@ -81,7 +81,7 @@ if "orden_seleccionada" not in st.session_state:
 # --- BARRA LATERAL (SIMPLE) ---
 with st.sidebar:
     st.markdown("<h2 class='brand-title' style='color: #D4AF37; margin-bottom: 0px;'>crealag</h2>", unsafe_allow_html=True)
-    st.caption("Panel Ejecutivo y Supervisión")
+    st.caption("Panel de Supervisión")
     st.markdown("---")
     st.success("🔒 **Solo Lectura**")
     st.markdown("---")
@@ -103,8 +103,8 @@ if st.session_state.orden_seleccionada is None:
         st.markdown("""
             <div class="welcome-card">
                 <h1 class="brand-title" style="color: #D4AF37; font-size: 36px; margin-bottom: 10px;">crealag</h1>
-                <h3 style="color: #F8FAFC; font-weight: 400; margin-bottom: 20px;">Sistema de Supervisión Gerencial</h3>
-                <p style="color: #94A3B8; font-size: 15px;">Bienvenido al portal de control ejecutivo. Por favor, seleccione la Orden de Compra que desea monitorear para visualizar los datos en tiempo real.</p>
+                <h3 style="color: #F8FAFC; font-weight: 400; margin-bottom: 20px;">Sistema de Supervisión</h3>
+                <p style="color: #94A3B8; font-size: 15px;">Bienvenido al portal de control. Por favor, seleccione la Orden de Compra que desea monitorear para visualizar los datos en tiempo real.</p>
             </div>
         """, unsafe_allow_html=True)
         
