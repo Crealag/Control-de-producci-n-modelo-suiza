@@ -21,7 +21,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS - Paleta Clara / Fondo Blanco Suave
+# Estilos CSS - Paleta Clara / Fondo Blanco con Controles Sobrios y Elegantes
 st.markdown("""
     <style>
     /* Fondo global blanco suave */
@@ -41,7 +41,7 @@ st.markdown("""
         color: #0F172A !important;
     }
     
-    /* Menús desplegables / Selects */
+    /* Menús desplegables / Selects en tema claro sobrio */
     div[data-baseweb="select"] > div {
         background-color: #FFFFFF !important;
         color: #0F172A !important;
@@ -53,19 +53,19 @@ st.markdown("""
         color: #0F172A !important;
     }
     
-    /* Botones primarios y secundarios */
-    .stButton>button, button[kind="primary"] {
-        background-color: #0F172A !important;
+    /* Botones sobrios sin colores fosforescentes (gris oscuro corporativo) */
+    .stButton>button, button[kind="primary"], div.stButton > button {
+        background-color: #1E293B !important;
         color: #FFFFFF !important;
-        border: 1px solid #0F172A !important;
+        border: 1px solid #1E293B !important;
         border-radius: 8px !important;
         font-weight: 600 !important;
         padding: 8px 16px !important;
         transition: all 0.2s ease !important;
     }
-    .stButton>button:hover, button[kind="primary"]:hover {
-        background-color: #1E293B !important;
-        border-color: #1E293B !important;
+    .stButton>button:hover, button[kind="primary"]:hover, div.stButton > button:hover {
+        background-color: #0F172A !important;
+        border-color: #0F172A !important;
         color: #FFFFFF !important;
     }
 
@@ -238,7 +238,6 @@ else:
                         pzas = df_diario.get(fecha_curr, 0)
                         
                         if pzas > 0:
-                            # Tarjeta para días con producción (Fondo ámbar/dorado suave con texto oscuro legible)
                             st.markdown(f"""
                                 <div style="background-color: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px; padding: 10px; text-align: center;">
                                     <div style="font-size: 16px; font-weight: bold; color: #78350F !important;">{dia}</div>
@@ -246,7 +245,6 @@ else:
                                 </div>
                             """, unsafe_allow_html=True)
                         else:
-                            # Tarjeta para días sin producción (Fondo blanco pulcro)
                             st.markdown(f"""
                                 <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px; text-align: center;">
                                     <div style="font-size: 16px; font-weight: bold; color: #94A3B8 !important;">{dia}</div>
@@ -255,13 +253,4 @@ else:
                             """, unsafe_allow_html=True)
 
         st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown("---")
-        csv_reporte_gen = df_oc_prod.groupby('fecha', as_index=False)['piezas_producidas'].sum().to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Descargar Reporte Consolidado (CSV)",
-            data=csv_reporte_gen,
-            file_name=f"Reporte_Calendario_{oc_actual}.csv",
-            mime="text/csv"
-        )
-    else:
-        st.info("Aún no hay registros de producción para esta orden en la base de datos.")
+        st.
