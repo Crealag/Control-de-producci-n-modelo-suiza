@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import os
 from supabase import create_client
 
 # Configuración de la página con la identidad corporativa de Crealag (Panel Gerencial)
@@ -45,22 +44,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Archivo de configuración local para el catálogo de Órdenes de Compra
-CONFIG_FILE = "oc_catalogo.csv"
-
-def cargar_catalogo_ocs():
-    if os.path.exists(CONFIG_FILE):
-        df_cfg = pd.read_csv(CONFIG_FILE)
-        if not df_cfg.empty:
-            if "Estado" not in df_cfg.columns:
-                df_cfg["Estado"] = "Activa"
-            if "Piezas_Entregadas" not in df_cfg.columns:
-                df_cfg["Piezas_Entregadas"] = 0
-            return df_cfg
-    return pd.DataFrame([{"Orden_Compra": "HER-080526", "Meta_Piezas": 100, "Estado": "Activa", "Piezas_Entregadas": 0}])
-
-df_ocs_catalogo = cargar_catalogo_ocs()
-
 # --- FUNCIONES DE BASE DE DATOS (SUPABASE) ---
 def cargar_datos_supabase():
     try:
@@ -76,6 +59,12 @@ def cargar_datos_supabase():
 
 df_produccion = cargar_datos_supabase()
 
+# --- CARGAR ÓRDENES DE COMPRA DIRECTAMENTE DE LA NUBE ---
+if not df_produccion.empty and "orden_compra" in df_produccion.columns:
+    lista_ocs = df_produccion["orden_compra"].unique().tolist()
+else:
+    lista_ocs = ["HER-080526"]
+
 # --- BARRA LATERAL (SIMPLE) ---
 with st.sidebar:
     st.markdown("<h2 class='brand-title' style='color: #D4AF37; margin-bottom: 0px;'>crealag</h2>", unsafe_allow_html=True)
@@ -83,27 +72,23 @@ with st.sidebar:
     st.markdown("---")
     st.success("🔒 **Solo Lectura**")
     st.markdown("---")
-    st.info("ℹ️ Este panel muestra el estado actual de las órdenes de compra y el almacén en tiempo real.")
+    st.info("ℹ️ Este panel muestra el estado actual de las órdenes de compra y el almacén en tiempo real directamente desde la nube.")
 
 # Título principal
 st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Panel de Órdenes y Almacén</span></h1>", unsafe_allow_html=True)
 st.markdown("---")
 
 # --- SECCIÓN PRINCIPAL: SELECCIÓN DIRECTA DE OC ---
-lista_ocs = df_ocs_catalogo["Orden_Compra"].tolist()
-
 st.markdown("### 📋 Seleccione la Orden de Compra que desea consultar:")
 oc_actual = st.selectbox("", lista_ocs, label_visibility="collapsed")
 
-# Obtener datos de la OC seleccionada
-row_oc = df_ocs_catalogo[df_ocs_catalogo["Orden_Compra"] == oc_actual].iloc[0]
-meta_oc = int(row_oc["Meta_Piezas"])
-
-# Calcular producción total y piezas disponibles en almacén
+# Filtrar registros de la OC seleccionada
 df_oc_prod = df_produccion[df_produccion["orden_compra"] == oc_actual] if not df_produccion.empty and "orden_compra" in df_produccion.columns else pd.DataFrame()
 total_producido = int(df_oc_prod["piezas_producidas"].sum()) if not df_oc_prod.empty else 0
-piezas_entregadas_previas = int(row_oc["Piezas_Entregadas"]) if "Piezas_Entregadas" in row_oc else 0
-piezas_en_almacen = max(0, total_producido - piezas_entregadas_previas)
+
+# Meta estimada estándar (por defecto 100 o ajustable según tus necesidades)
+meta_oc = 100 
+piezas_en_almacen = total_producido  # Stock directo en base a lo producido
 
 st.markdown("---")
 
@@ -111,13 +96,13 @@ st.markdown("---")
 if total_producido >= meta_oc:
     st.success(f"🟢 **ESTADO DE LA ORDEN `{oc_actual}`:** ¡TERMINADA! Se alcanzó o superó la meta de {meta_oc} piezas.")
 else:
-    st.warning(f"🟡 **ESTADO DE LA ORDEN `{oc_actual}`:** EN PROCESO (Faltan {meta_oc - total_producido} piezas para completar la meta).")
+    st.warning(f"🟡 **ESTADO DE LA ORDEN `{oc_actual}`:** EN PROCESO (Faltan {max(0, meta_oc - total_producido)} piezas para completar la meta estimada).")
 
 # Métricas claras en pantalla grande
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Meta de la OC", f"{meta_oc} pzas")
+m1.metric("Meta Estimada OC", f"{meta_oc} pzas")
 m2.metric("Producido Total", f"{total_producido} pzas")
-m3.metric("Entregadas / Remitidas", f"{piezas_entregadas_previas} pzas")
+m3.metric("Entregadas / Remitidas", "0 pzas")
 m4.metric("Disponibles en Almacén", f"{piezas_en_almacen} pzas")
 
 porcentaje = min(1.0, total_producido / meta_oc) if meta_oc > 0 else 0.0
@@ -128,7 +113,6 @@ st.markdown("---")
 # HISTORIAL DE REGISTROS
 st.markdown(f"### 📑 Historial de Fabricación - `{oc_actual}`")
 if not df_oc_prod.empty:
-    # Renombrar columnas para que se vean más amigables a la vista de los jefes
     df_mostrar = df_oc_prod.sort_values(by="id", ascending=False)[["fecha", "hora", "piezas_producidas", "observaciones_turno"]]
     df_mostrar.columns = ["Fecha", "Hora", "Piezas Producidas", "Observaciones del Turno"]
     st.dataframe(df_mostrar, use_container_width=True)
