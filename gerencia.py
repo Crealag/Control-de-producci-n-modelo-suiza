@@ -1,11 +1,10 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 from supabase import create_client
 
-# Configuración de la página con la identidad corporativa de Crealag (Panel Gerencial)
+# Configuración de la página con la identidad corporativa de Crealag (Sistema de Supervisión)
 st.set_page_config(
-    page_title="crealag - Panel Gerencial y Supervisión", 
+    page_title="crealag - Sistema de Supervisión", 
     layout="wide", 
     page_icon="🏢"
 )
@@ -53,7 +52,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNCIONES DE BASE DE DATOS (SUPABASE) ---
+# --- CARGAR CATÁLOGO DE ÓRDENES Y PRODUCCIÓN DESDE SUPABASE ---
+def cargar_catalogo_ocs():
+    try:
+        res = supabase.table("Órdenes_Compra").select("*").execute()
+        if res.data:
+            return pd.DataFrame(res.data)
+    except Exception:
+        pass
+    return pd.DataFrame(columns=["orden_compra", "meta_piezas", "estado", "piezas_entregadas"])
+
 def cargar_datos_supabase():
     try:
         response = supabase.table("Producción").select("*").execute()
@@ -66,22 +74,20 @@ def cargar_datos_supabase():
         st.error(f"Error al conectar con la base de datos: {e}")
         return pd.DataFrame(columns=["id", "orden_compra", "fecha", "hora", "piezas_producidas", "observaciones_turno"])
 
+df_ocs_catalogo = cargar_catalogo_ocs()
 df_produccion = cargar_datos_supabase()
 
-# --- CARGAR ÓRDENES DE COMPRA DIRECTAMENTE DE LA NUBE ---
-if not df_produccion.empty and "orden_compra" in df_produccion.columns:
-    lista_ocs = df_produccion["orden_compra"].unique().tolist()
-else:
-    lista_ocs = ["HER-080526"]
+# Obtener la lista estricta de órdenes oficiales desde el catálogo en la nube
+lista_ocs = df_ocs_catalogo["orden_compra"].tolist() if not df_ocs_catalogo.empty else []
 
-# Inicializar el estado de la sesión para controlar si ya se seleccionó una orden
+# Inicializar el estado de la sesión para controlar la orden seleccionada
 if "orden_seleccionada" not in st.session_state:
     st.session_state.orden_seleccionada = None
 
-# --- BARRA LATERAL (SIMPLE) ---
+# --- BARRA LATERAL (SISTEMA DE SUPERVISIÓN) ---
 with st.sidebar:
     st.markdown("<h2 class='brand-title' style='color: #D4AF37; margin-bottom: 0px;'>crealag</h2>", unsafe_allow_html=True)
-    st.caption("Panel de Supervisión")
+    st.caption("Sistema de Supervisión")
     st.markdown("---")
     st.success("🔒 **Solo Lectura**")
     st.markdown("---")
@@ -92,7 +98,7 @@ with st.sidebar:
             st.rerun()
             
     st.markdown("---")
-    st.info("ℹ️ Este panel muestra el estado actual de la producción y el almacén en tiempo real.")
+    st.info("ℹ️ Este panel muestra el estado actual de la producción sincronizado en tiempo real.")
 
 # --- PANTALLA 1: BIENVENIDA Y SELECCIÓN INICIAL ---
 if st.session_state.orden_seleccionada is None:
@@ -110,14 +116,17 @@ if st.session_state.orden_seleccionada is None:
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        with st.form("form_bienvenida"):
-            oc_elegida = st.selectbox("Seleccione una Orden de Compra:", lista_ocs)
-            st.markdown("<br>", unsafe_allow_html=True)
-            btn_continuar = st.form_submit_button("Consultar Orden de Compra", use_container_width=True, type="primary")
-            
-        if btn_continuar:
-            st.session_state.orden_seleccionada = oc_elegida
-            st.rerun()
+        if lista_ocs:
+            with st.form("form_bienvenida"):
+                oc_elegida = st.selectbox("Seleccione una Orden de Compra:", lista_ocs)
+                st.markdown("<br>", unsafe_allow_html=True)
+                btn_continuar = st.form_submit_button("Consultar Orden de Compra", use_container_width=True, type="primary")
+                
+            if btn_continuar:
+                st.session_state.orden_seleccionada = oc_elegida
+                st.rerun()
+        else:
+            st.warning("No hay Órdenes de Compra activas en el sistema.")
 
 # --- PANTALLA 2: VISUALIZACIÓN DE DATOS DE LA ORDEN SELECCIONADA ---
 else:
@@ -127,13 +136,16 @@ else:
     st.markdown(f"<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Orden de Compra: <b>{oc_actual}</b></span></h1>", unsafe_allow_html=True)
     st.markdown("---")
 
-    # Filtrar registros de la OC seleccionada
+    # Extraer meta y estado directamente de la tabla de Supabase
+    row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc[0] if not df_ocs_catalogo.empty and oc_actual in df_ocs_catalogo["orden_compra"].values else {"meta_piezas": 100, "estado": "Activa", "piezas_entregadas": 0}
+    meta_oc = int(row_oc_info.get("meta_piezas", 100))
+    estado_oc = str(row_oc_info.get("estado", "Activa"))
+
+    # Filtrar registros de producción de la OC seleccionada
     df_oc_prod = df_produccion[df_produccion["orden_compra"] == oc_actual] if not df_produccion.empty and "orden_compra" in df_produccion.columns else pd.DataFrame()
     total_producido = int(df_oc_prod["piezas_producidas"].sum()) if not df_oc_prod.empty else 0
-
-    # Meta estimada estándar
-    meta_oc = 100 
-    piezas_en_almacen = total_producido
+    piezas_entregadas = int(row_oc_info.get("piezas_entregadas", 0))
+    piezas_almacen = max(0, total_producido - piezas_entregadas)
 
     # Estado de la orden
     if total_producido >= meta_oc:
@@ -145,8 +157,8 @@ else:
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Meta Estimada OC", f"{meta_oc} pzas")
     m2.metric("Producido Total", f"{total_producido} pzas")
-    m3.metric("Entregadas / Remitidas", "0 pzas")
-    m4.metric("Disponibles en Almacén", f"{piezas_en_almacen} pzas")
+    m3.metric("Entregadas / Remitidas", f"{piezas_entregadas} pzas")
+    m4.metric("Disponibles en Almacén", f"{piezas_almacen} pzas")
 
     porcentaje = min(1.0, total_producido / meta_oc) if meta_oc > 0 else 0.0
     st.progress(porcentaje)
