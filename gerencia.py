@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import os
 from supabase import create_client
 
 # Configuración de la página con la identidad corporativa de Crealag (Panel Gerencial)
