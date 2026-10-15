@@ -21,59 +21,61 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS - Paleta Oscura Suave Corporativa Crealag (Descanso Visual)
+# Estilos CSS - Paleta Clara / Fondo Blanco Suave
 st.markdown("""
     <style>
-    /* Fondo principal y estructura */
+    /* Fondo global blanco suave */
     .stApp, [data-testid="stHeader"], [data-testid="stToolbar"] {
-        background-color: #0A0F1D !important;
-        color: #F8FAFC !important;
+        background-color: #FFFFFF !important;
+        color: #0F172A !important;
     }
+    
+    /* Barra lateral */
     [data-testid="stSidebar"] {
-        background-color: #111B2E !important;
-        border-right: 1px solid #1E293B !important;
+        background-color: #F8FAFC !important;
+        border-right: 1px solid #E2E8F0 !important;
     }
     
-    /* Textos y títulos */
+    /* Textos, títulos y párrafos */
     h1, h2, h3, h4, h5, h6, p, span, label, div, .stMarkdown {
-        color: #F8FAFC !important;
+        color: #0F172A !important;
     }
     
-    /* Menús desplegables y Selects equilibrados */
+    /* Menús desplegables / Selects */
     div[data-baseweb="select"] > div {
-        background-color: #111B2E !important;
-        color: #F8FAFC !important;
-        border: 1px solid #2D3E5E !important;
+        background-color: #FFFFFF !important;
+        color: #0F172A !important;
+        border: 1px solid #CBD5E1 !important;
         border-radius: 8px !important;
     }
     [data-baseweb="popover"], [data-baseweb="menu"] {
-        background-color: #111B2E !important;
-        color: #F8FAFC !important;
+        background-color: #FFFFFF !important;
+        color: #0F172A !important;
     }
     
-    /* Botón Principal (Dorado suave sobrio en lugar de rojo agresivo) */
+    /* Botones primarios y secundarios */
     .stButton>button, button[kind="primary"] {
-        background: linear-gradient(135deg, #2D2412 0%, #1A160A 100%) !important;
-        color: #E2E8F0 !important;
-        border: 1px solid #D4AF37 !important;
+        background-color: #0F172A !important;
+        color: #FFFFFF !important;
+        border: 1px solid #0F172A !important;
         border-radius: 8px !important;
         font-weight: 600 !important;
-        padding: 10px 16px !important;
+        padding: 8px 16px !important;
         transition: all 0.2s ease !important;
     }
     .stButton>button:hover, button[kind="primary"]:hover {
-        background: linear-gradient(135deg, #3D311A 0%, #2A2210 100%) !important;
-        border-color: #F59E0B !important;
+        background-color: #1E293B !important;
+        border-color: #1E293B !important;
         color: #FFFFFF !important;
     }
 
     /* Métricas */
     [data-testid="stMetricValue"] {
-        color: #F8FAFC !important;
+        color: #0F172A !important;
         font-weight: 700 !important;
     }
     [data-testid="stMetricLabel"] {
-        color: #94A3B8 !important;
+        color: #475569 !important;
     }
     
     /* Marca Crealag */
@@ -81,17 +83,17 @@ st.markdown("""
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
         font-weight: 800;
         letter-spacing: -1px;
-        color: #F8FAFC !important;
+        color: #0F172A !important;
     }
     
-    /* Tarjeta de bienvenida bien integrada */
+    /* Tarjeta de bienvenida */
     .welcome-card {
-        background: #111B2E;
-        border: 1px solid #1E293B;
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
         border-radius: 12px;
         padding: 40px;
         text-align: center;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
         margin-top: 30px;
     }
     </style>
@@ -129,7 +131,7 @@ if "orden_seleccionada" not in st.session_state:
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    st.markdown("<h2 class='brand-title' style='color: #D4AF37 !important; margin-bottom: 0px;'>crealag</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='brand-title' style='color: #B45309 !important; margin-bottom: 0px;'>crealag</h2>", unsafe_allow_html=True)
     st.caption("Sistema de Supervisión")
     st.markdown("---")
     st.success("🔒 **Solo Lectura**")
@@ -147,9 +149,9 @@ if st.session_state.orden_seleccionada is None:
     with col2:
         st.markdown("""
             <div class="welcome-card">
-                <h1 class="brand-title" style="color: #D4AF37 !important; font-size: 36px; margin-bottom: 10px;">crealag</h1>
-                <h3 style="color: #F8FAFC !important; font-weight: 400; margin-bottom: 20px;">Sistema de Supervisión</h3>
-                <p style="color: #94A3B8 !important; font-size: 15px;">Seleccione la Orden de Compra que desea monitorear en tiempo real.</p>
+                <h1 class="brand-title" style="color: #B45309 !important; font-size: 36px; margin-bottom: 10px;">crealag</h1>
+                <h3 style="color: #0F172A !important; font-weight: 500; margin-bottom: 20px;">Sistema de Supervisión</h3>
+                <p style="color: #64748B !important; font-size: 15px;">Seleccione la Orden de Compra que desea monitorear en tiempo real.</p>
             </div>
         """, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
@@ -169,7 +171,7 @@ if st.session_state.orden_seleccionada is None:
 else:
     oc_actual = st.session_state.orden_seleccionada
     
-    st.markdown(f"<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8 !important;'>| Orden de Compra: <b>{oc_actual}</b></span></h1>", unsafe_allow_html=True)
+    st.markdown(f"<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #64748B !important;'>| Orden de Compra: <b>{oc_actual}</b></span></h1>", unsafe_allow_html=True)
     st.markdown("---")
 
     row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc[0] if not df_ocs_catalogo.empty and oc_actual in df_ocs_catalogo["orden_compra"].values else {"meta_piezas": 1700, "estado": "Activa", "piezas_entregadas": 0}
@@ -197,7 +199,7 @@ else:
 
     st.markdown("---")
 
-    # --- CALENDARIO VISUAL ---
+    # --- CALENDARIO VISUAL EN FONDO CLARO ---
     st.markdown(f"### 📅 Calendario de Producción - `{oc_actual}`")
 
     if not df_oc_prod.empty:
@@ -218,7 +220,7 @@ else:
         cols_header = st.columns(7)
         dias_semana_nombres = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
         for idx, d_nombre in enumerate(dias_semana_nombres):
-            cols_header[idx].markdown(f"**<div style='text-align: center; color: #94A3B8 !important;'>{d_nombre}</div>**", unsafe_allow_html=True)
+            cols_header[idx].markdown(f"**<div style='text-align: center; color: #475569 !important;'>{d_nombre}</div>**", unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
 
@@ -236,17 +238,19 @@ else:
                         pzas = df_diario.get(fecha_curr, 0)
                         
                         if pzas > 0:
+                            # Tarjeta para días con producción (Fondo ámbar/dorado suave con texto oscuro legible)
                             st.markdown(f"""
-                                <div style="background-color: rgba(212, 175, 55, 0.15); border: 1px solid #D4AF37; border-radius: 8px; padding: 10px; text-align: center;">
-                                    <div style="font-size: 16px; font-weight: bold; color: #F8FAFC !important;">{dia}</div>
+                                <div style="background-color: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px; padding: 10px; text-align: center;">
+                                    <div style="font-size: 16px; font-weight: bold; color: #78350F !important;">{dia}</div>
                                     <div style="background-color: #D4AF37; color: #0A0F1D !important; font-size: 11px; font-weight: bold; border-radius: 4px; padding: 2px 4px; margin-top: 4px;">⚡ {pzas} pzas</div>
                                 </div>
                             """, unsafe_allow_html=True)
                         else:
+                            # Tarjeta para días sin producción (Fondo blanco pulcro)
                             st.markdown(f"""
-                                <div style="background-color: #111B2E; border: 1px solid #1E293B; border-radius: 8px; padding: 10px; text-align: center;">
-                                    <div style="font-size: 16px; font-weight: bold; color: #64748B !important;">{dia}</div>
-                                    <div style="font-size: 11px; color: #334155 !important; margin-top: 4px;">-</div>
+                                <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px; text-align: center;">
+                                    <div style="font-size: 16px; font-weight: bold; color: #94A3B8 !important;">{dia}</div>
+                                    <div style="font-size: 11px; color: #CBD5E1 !important; margin-top: 4px;">-</div>
                                 </div>
                             """, unsafe_allow_html=True)
 
