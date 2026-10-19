@@ -25,21 +25,32 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS
-st.markdown("""
-    <style>
-    .stApp { background-color: #0A0F1D; color: #F8FAFC; }
-    [data-testid="stSidebar"] { background-color: #111B2E; }
-    div[data-baseweb="input"], div[data-baseweb="select"], div[data-baseweb="base-input"] {
-        background-color: #1A263D !important; color: #F8FAFC !important; border-color: #2D3E5E !important;
-    }
-    .stButton>button {
-        background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
-        color: #F8FAFC; border: 1px solid #D4AF37; border-radius: 6px; font-weight: 600;
-    }
-    .brand-title { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; color: #F8FAFC; }
-    </style>
-""", unsafe_allow_html=True)
+# Estilos CSS - Paleta Oscura Neutra y Elegante (Sin colores fosforescentes)
+css_estilos = """
+<style>
+.stApp { background-color: #0A0F1D; color: #F8FAFC; }
+[data-testid="stSidebar"] { background-color: #111B2E; border-right: 1px solid #1E293B; }
+div[data-baseweb="input"], div[data-baseweb="select"], div[data-baseweb="base-input"] {
+    background-color: #1A263D !important; color: #F8FAFC !important; border-color: #334155 !important;
+}
+button, .stButton>button, [data-testid="baseButton-primary"] {
+    background-color: #1E293B !important;
+    color: #F8FAFC !important;
+    border: 1px solid #334155 !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+}
+button:hover, .stButton>button:hover, [data-testid="baseButton-primary"]:hover {
+    background-color: #2D3E5E !important;
+    border-color: #475569 !important;
+    color: #FFFFFF !important;
+}
+.brand-title { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; color: #F8FAFC; }
+[data-testid="stMetricValue"] { color: #F8FAFC !important; font-weight: 800 !important; }
+[data-testid="stMetricLabel"] { color: #94A3B8 !important; font-weight: 700 !important; }
+</style>
+"""
+st.markdown(css_estilos, unsafe_allow_html=True)
 
 # --- FUNCIONES DE BASE DE DATOS ---
 def cargar_catalogo_ocs():
@@ -148,7 +159,6 @@ def generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_
     story.append(t_campos)
     story.append(Spacer(1, 25))
     
-    # Modelo Suiza en negritas y subrayado
     texto_cuerpo = f"Referente a su pedido <b><u>{oc_actual}</u></b> recibido el <b><u>{fecha_recibido_str}</u></b>. Se hace entrega de <b><u>{cantidad_piezas}</u></b> piezas de respaldo de silla <b><u>modelo Suiza</u></b>."
     style_cuerpo = ParagraphStyle('CuerpoRemision', fontName='Helvetica', fontSize=10.5, leading=16, textColor=colors.HexColor('#0F172A'))
     story.append(Paragraph(texto_cuerpo, style_cuerpo))
@@ -180,7 +190,7 @@ def generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    st.markdown("<h2 class='brand-title' style='color: #D4AF37;'>crealag</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='brand-title'>crealag</h2>", unsafe_allow_html=True)
     st.caption("Fabricante mueblerio metalformado A.C. e INOX")
     st.markdown("---")
     
@@ -289,26 +299,45 @@ if menu_seleccionado == "📊 Producción y Registro":
             st.rerun()
 
     st.markdown("---")
-    st.subheader(f"📋 Historial de Producción - {oc_actual}")
+    st.subheader(f"📋 Historial y Ritmo de Producción - {oc_actual}")
+    
     if not df_oc.empty:
-        st.dataframe(df_oc.sort_values(by="id", ascending=False), use_container_width=True)
-        with st.expander("✏️ Editar o Eliminar un Registro de Producción"):
-            id_sel = st.selectbox("Selecciona ID:", df_oc["id"].tolist())
-            row_sel = df_oc[df_oc["id"] == id_sel].iloc[0]
+        # Pestañas o separación limpia para ver tanto la tabla como la gráfica de rendimiento diario
+        tab_tabla, tab_grafica = st.tabs(["📄 Tabla de Registros", "📊 Gráfico de Producción Diaria"])
+        
+        with tab_tabla:
+            st.dataframe(df_oc.sort_values(by="id", ascending=False), use_container_width=True)
+            with st.expander("✏️ Editar o Eliminar un Registro de Producción"):
+                id_sel = st.selectbox("Selecciona ID:", df_oc["id"].tolist())
+                row_sel = df_oc[df_oc["id"] == id_sel].iloc[0]
+                
+                c_e1, c_e2 = st.columns(2)
+                p_edit = c_e1.number_input("Piezas corregidas:", min_value=0, value=int(row_sel["piezas_producidas"]))
+                obs_edit = c_e2.text_input("Obs corregidas:", value=str(row_sel["observaciones_turno"]))
+                
+                cb1, cb2 = st.columns(2)
+                if cb1.button("💾 Guardar Cambios"):
+                    actualizar_registro_supabase(id_sel, p_edit, obs_edit)
+                    st.success("Actualizado")
+                    st.rerun()
+                if cb2.button("🗑️ Eliminar Registro"):
+                    eliminar_registro_supabase(id_sel)
+                    st.success("Eliminado")
+                    st.rerun()
+                    
+        with tab_grafica:
+            df_oc['fecha_dt'] = pd.to_datetime(df_oc['fecha'])
+            df_resumen_diario = df_oc.groupby('fecha_dt', as_index=False)['piezas_producidas'].sum().sort_values(by='fecha_dt')
             
-            c_e1, c_e2 = st.columns(2)
-            p_edit = c_e1.number_input("Piezas corregidas:", min_value=0, value=int(row_sel["piezas_producidas"]))
-            obs_edit = c_e2.text_input("Obs corregidas:", value=str(row_sel["observaciones_turno"]))
-            
-            cb1, cb2 = st.columns(2)
-            if cb1.button("💾 Guardar Cambios"):
-                actualizar_registro_supabase(id_sel, p_edit, obs_edit)
-                st.success("Actualizado")
-                st.rerun()
-            if cb2.button("🗑️ Eliminar Registro"):
-                eliminar_registro_supabase(id_sel)
-                st.success("Eliminado")
-                st.rerun()
+            if not df_resumen_diario.empty:
+                st.bar_chart(
+                    data=df_resumen_diario.set_index('fecha_dt')['piezas_producidas'],
+                    use_container_width=True
+                )
+            else:
+                st.info("No hay suficientes datos para generar la gráfica.")
+    else:
+        st.info("Aún no hay registros de producción para esta orden.")
 
 elif menu_seleccionado == "📄 Generador de Remisiones":
     st.subheader("Generador de Remisiones Oficiales - Formato Original Crealag")
