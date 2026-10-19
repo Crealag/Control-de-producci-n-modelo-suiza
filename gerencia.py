@@ -20,7 +20,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS - Paleta Oscura Ejecutiva Crealag
+# Estilos CSS - Paleta Oscura Neutra y Elegante (Sin tonos amarillos/dorados)
 css_estilos = """
 <style>
 .stApp, [data-testid="stHeader"], [data-testid="stToolbar"] {
@@ -38,7 +38,7 @@ h1, h2, h3, h4, h5, h6, p, span, label, div, .stMarkdown {
 div[data-baseweb="select"] > div {
     background-color: #1A263D !important;
     color: #F8FAFC !important;
-    border: 1px solid #2D3E5E !important;
+    border: 1px solid #334155 !important;
     border-radius: 8px !important;
 }
 [data-baseweb="popover"], [data-baseweb="menu"] {
@@ -46,13 +46,18 @@ div[data-baseweb="select"] > div {
     color: #F8FAFC !important;
 }
 button, .stButton > button, [data-testid="baseButton-primary"], div.stButton > button {
-    background: linear-gradient(135deg, #2D2412 0%, #1A160A 100%) !important;
+    background-color: #1E293B !important;
     color: #F8FAFC !important;
-    border: 1px solid #D4AF37 !important;
+    border: 1px solid #334155 !important;
     border-radius: 8px !important;
     font-size: 16px !important;
     font-weight: 800 !important;
     padding: 10px 20px !important;
+}
+button:hover, .stButton > button:hover, [data-testid="baseButton-primary"]:hover, div.stButton > button:hover {
+    background-color: #2D3E5E !important;
+    border-color: #475569 !important;
+    color: #FFFFFF !important;
 }
 [data-testid="stMetricValue"] {
     color: #F8FAFC !important;
@@ -113,7 +118,7 @@ if "orden_seleccionada" not in st.session_state:
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    st.markdown("<h2 class='brand-title' style='color: #D4AF37 !important; margin-bottom: 0px;'>crealag</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='brand-title' style='color: #F8FAFC !important; margin-bottom: 0px;'>crealag</h2>", unsafe_allow_html=True)
     st.caption("Sistema de Supervisión")
     st.markdown("---")
     st.success("🔒 **Solo Lectura**")
@@ -131,9 +136,9 @@ if st.session_state.orden_seleccionada is None:
     with col2:
         st.markdown("""
             <div class="welcome-card">
-                <h1 class="brand-title" style="color: #D4AF37 !important; font-size: 38px; margin-bottom: 10px; font-weight: 800;">crealag</h1>
-                <h2 style="color: #F8FAFC !important; font-weight: 700; margin-bottom: 20px; font-size: 24px;">Sistema de Supervisión</h2>
-                <p style="color: #94A3B8 !important; font-size: 16px; font-weight: 600;">Seleccione la Orden de Compra que desea monitorear en tiempo real.</p>
+                <h1 class="brand-title" style="color: #F8FAFC !important; font-size: 38px; margin-bottom: 10px; font-weight: 800;">crealag</h1>
+                <h2 style="color: #94A3B8 !important; font-weight: 700; margin-bottom: 20px; font-size: 24px;">Sistema de Supervisión</h2>
+                <p style="color: #F8FAFC !important; font-size: 16px; font-weight: 600;">Seleccione la Orden de Compra que desea monitorear en tiempo real.</p>
             </div>
         """, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
@@ -190,7 +195,6 @@ else:
         df_resumen_diario['Fecha'] = df_resumen_diario['fecha_dt'].dt.strftime('%d / %m / %Y')
         df_resumen_diario['Piezas Fabricadas'] = df_resumen_diario['piezas_producidas'].apply(lambda x: f"{x} pzas")
 
-        # Tabla de ancho fijo estático
         st.dataframe(
             df_resumen_diario[['Fecha', 'Piezas Fabricadas']],
             use_container_width=True,
