@@ -132,38 +132,4 @@ def generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_
     style_normal = styles['Normal']
     
     style_logo = ParagraphStyle('LogoCrealag', fontName='Helvetica-Bold', fontSize=28, textColor=colors.HexColor('#0A0F1D'), leading=30)
-    story.append(Paragraph("<b>crealag</b>", style_logo))
-    story.append(Spacer(1, 4))
-    
-    tabla_linea = Table([['']], colWidths=[540], rowHeights=[2.5])
-    tabla_linea.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#0A0F1D'))]))
-    story.append(tabla_linea)
-    story.append(Spacer(1, 20))
-    
-    style_label = ParagraphStyle('LabelEstilo', fontName='Helvetica-Bold', fontSize=10, textColor=colors.HexColor('#0F172A'))
-    style_val = ParagraphStyle('ValEstilo', fontName='Helvetica', fontSize=10, textColor=colors.HexColor('#0F172A'))
-    
-    data_campos = [
-        [Paragraph("<b>Atención:</b>", style_label), Paragraph(atencion, style_val)],
-        [Paragraph("<b>Compañía:</b>", style_label), Paragraph(compania, style_val)],
-        [Paragraph("<b>Puesto:</b>", style_label), Paragraph(puesto, style_val)],
-        [Paragraph("<b>Email:</b>", style_label), Paragraph(email, style_val)],
-        [Paragraph("<b>Cel:</b>", style_label), Paragraph(cel, style_val)],
-        [Paragraph("<b>Referencia:</b>", style_label), Paragraph(referencia, style_val)],
-        [Paragraph("<b>Documento:</b>", style_label), Paragraph("FTO:2026-REM-1", style_val)],
-        [Paragraph("<b>Referencia cliente:</b>", style_label), Paragraph(oc_actual, style_val)],
-        [Paragraph("<b>Fecha:</b>", style_label), Paragraph(fecha_remision.strftime('%d / %m / %Y'), style_val)]
-    ]
-    t_campos = Table(data_campos, colWidths=[130, 380])
-    t_campos.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3)]))
-    story.append(t_campos)
-    story.append(Spacer(1, 25))
-    
-    texto_cuerpo = f"Referente a su pedido <b><u>{oc_actual}</u></b> recibido el <b><u>{fecha_recibido_str}</u></b>. Se hace entrega de <b><u>{cantidad_piezas}</u></b> piezas de respaldo de silla <b><u>modelo Suiza</u></b>."
-    style_cuerpo = ParagraphStyle('CuerpoRemision', fontName='Helvetica', fontSize=10.5, leading=16, textColor=colors.HexColor('#0F172A'))
-    story.append(Paragraph(texto_cuerpo, style_cuerpo))
-    story.append(Spacer(1, 260))
-    
-    style_firma_texto = ParagraphStyle('FirmaTexto', fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#0F172A'), alignment=1)
-    data_firmas = [
-        [Paragraph("____________________________________________", style_normal), Paragraph
+    story
