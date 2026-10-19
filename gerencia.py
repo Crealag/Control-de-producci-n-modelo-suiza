@@ -20,72 +20,66 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS - Paleta Oscura Ejecutiva Crealag (Estructura Fija)
-st.markdown("""
-    <style>
-    .stApp, [data-testid="stHeader"], [data-testid="stToolbar"] {
-        background-color: #0A0F1D !important;
-        color: #F8FAFC !important;
-    }
-    [data-testid="stSidebar"] {
-        background-color: #111B2E !important;
-        border-right: 1px solid #1E293B !important;
-    }
-    h1, h2, h3, h4, h5, h6, p, span, label, div, .stMarkdown {
-        color: #F8FAFC !important;
-        font-weight: 700 !important;
-    }
-    div[data-baseweb="select"] > div {
-        background-color: #1A263D !important;
-        color: #F8FAFC !important;
-        border: 1px solid #2D3E5E !important;
-        border-radius: 8px !important;
-    }
-    [data-baseweb="popover"], [data-baseweb="menu"] {
-        background-color: #111B2E !important;
-        color: #F8FAFC !important;
-    }
-    button, .stButton > button, [data-testid="baseButton-primary"], div.stButton > button {
-        background: linear-gradient(135deg, #2D2412 0%, #1A160A 100%) !important;
-        color: #F8FAFC !important;
-        border: 1px solid #D4AF37 !important;
-        border-radius: 8px !important;
-        font-size: 16px !important;
-        font-weight: 800 !important;
-        padding: 10px 20px !important;
-    }
-    [data-testid="stMetricValue"] {
-        color: #F8FAFC !important;
-        font-weight: 800 !important;
-        font-size: 30px !important;
-    }
-    [data-testid="stMetricLabel"] {
-        color: #94A3B8 !important;
-        font-weight: 700 !important;
-    }
-    .brand-title {
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        font-weight: 800 !important;
-        color: #F8FAFC !important;
-    }
-    .welcome-card {
-        background: #111B2E;
-        border: 1px solid #1E293B;
-        border-radius: 12px;
-        padding: 40px;
-        text-align: center;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-        margin-top: 30px;
-    }
-    .row-card {
-        background-color: #111B2E;
-        border: 1px solid #1E293B;
-        border-radius: 8px;
-        padding: 14px 20px;
-        margin-bottom: 10px;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# Estilos CSS - Paleta Oscura Ejecutiva Crealag (Sintaxis simplificada para evitar errores)
+css_estilos = """
+<style>
+.stApp, [data-testid="stHeader"], [data-testid="stToolbar"] {
+    background-color: #0A0F1D !important;
+    color: #F8FAFC !important;
+}
+[data-testid="stSidebar"] {
+    background-color: #111B2E !important;
+    border-right: 1px solid #1E293B !important;
+}
+h1, h2, h3, h4, h5, h6, p, span, label, div, .stMarkdown {
+    color: #F8FAFC !important;
+    font-weight: 700 !important;
+}
+div[data-baseweb="select"] > div {
+    background-color: #1A263D !important;
+    color: #F8FAFC !important;
+    border: 1px solid #2D3E5E !important;
+    border-radius: 8px !important;
+}
+[data-baseweb="popover"], [data-baseweb="menu"] {
+    background-color: #111B2E !important;
+    color: #F8FAFC !important;
+}
+button, .stButton > button, [data-testid="baseButton-primary"], div.stButton > button {
+    background: linear-gradient(135deg, #2D2412 0%, #1A160A 100%) !important;
+    color: #F8FAFC !important;
+    border: 1px solid #D4AF37 !important;
+    border-radius: 8px !important;
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    padding: 10px 20px !important;
+}
+[data-testid="stMetricValue"] {
+    color: #F8FAFC !important;
+    font-weight: 800 !important;
+    font-size: 30px !important;
+}
+[data-testid="stMetricLabel"] {
+    color: #94A3B8 !important;
+    font-weight: 700 !important;
+}
+.brand-title {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-weight: 800 !important;
+    color: #F8FAFC !important;
+}
+.welcome-card {
+    background: #111B2E;
+    border: 1px solid #1E293B;
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    margin-top: 30px;
+}
+</style>
+"""
+st.markdown(css_estilos, unsafe_allow_html=True)
 
 # --- CARGAR DATOS ---
 def cargar_catalogo_ocs():
@@ -178,3 +172,18 @@ else:
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Meta Estimada OC", f"{meta_oc} pzas")
+    m2.metric("Producido Total", f"{total_producido} pzas")
+    m3.metric("Entregadas / Remitidas", f"{piezas_entregadas} pzas")
+    m4.metric("Disponibles en Almacén", f"{piezas_almacen} pzas")
+
+    porcentaje = min(1.0, total_producido / meta_oc) if meta_oc > 0 else 0.0
+    st.progress(porcentaje)
+
+    st.markdown("---")
+
+    # --- REGISTRO DIARIO CON ESTRUCTURA FIJA Y PAREJA ---
+    st.markdown(f"### 📋 Detalle Consolidado de Producción por Día - `{oc_actual}`")
+
+    if not df_oc_prod.empty:
+        df_oc_prod['fecha_dt'] = pd.to_datetime(df_oc_prod['fecha'])
+        df_resumen
