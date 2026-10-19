@@ -305,65 +305,10 @@ if menu_seleccionado == "📊 Producción y Registro":
             btn_registrar = st.form_submit_button("⚡ Registrar Piezas Producidas", type="primary", use_container_width=True)
             if btn_registrar:
                 f_str = fecha_in.strftime("%Y-%m-%d")
-                # Formato de hora AM / PM (ejemplo: 07:11 PM)
                 h_str = hora_in.strftime("%I:%M %p")
                 insertar_registro(oc_actual, f_str, h_str, cantidad_piezas_in, obs_in if obs_in else "Sin observaciones")
                 st.success(f"✅ ¡Registradas {cantidad_piezas_in} piezas a las {h_str}!")
                 st.rerun()
 
     st.markdown("---")
-    st.subheader(f"📋 Historial y Ritmo de Producción - {oc_actual}")
-    
-    if not df_oc.empty:
-        df_grafica = df_oc.copy()
-        df_grafica['fecha_str'] = df_grafica['fecha'].astype(str)
-        df_diario = df_grafica.groupby('fecha_str', as_index=False)['piezas_producidas'].sum().sort_values('fecha_str')
-        df_diario.columns = ['Fecha', 'Piezas Producidas']
-        
-        st.markdown("#### 📊 Ritmo de Producción Diaria (Tendencia)")
-        st.line_chart(df_diario, x='Fecha', y='Piezas Producidas', use_container_width=True)
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("#### 📄 Registros Detallados")
-        st.dataframe(df_oc.sort_values(by="id", ascending=False), use_container_width=True)
-        
-        with st.expander("✏️ Editar o Eliminar un Registro de Producción"):
-            id_sel = st.selectbox("Selecciona ID:", df_oc["id"].tolist())
-            row_sel = df_oc[df_oc["id"] == id_sel].iloc[0]
-            
-            c_e1, c_e2 = st.columns(2)
-            p_edit = c_e1.number_input("Piezas corregidas:", min_value=0, value=int(row_sel["piezas_producidas"]))
-            obs_edit = c_e2.text_input("Obs corregidas:", value=str(row_sel["observaciones_turno"]))
-            
-            cb1, cb2 = st.columns(2)
-            if cb1.button("💾 Guardar Cambios"):
-                actualizar_registro_supabase(id_sel, p_edit, obs_edit)
-                st.success("Actualizado")
-                st.rerun()
-            if cb2.button("🗑️ Eliminar Registro"):
-                eliminar_registro_supabase(id_sel)
-                st.success("Eliminado")
-                st.rerun()
-    else:
-        st.info("Aún no hay registros de producción para esta orden.")
-
-elif menu_seleccionado == "📄 Generador de Remisiones":
-    st.subheader("Generador de Remisiones Oficiales - Formato Original Crealag")
-    df_oc_rem = df[df["orden_compra"] == oc_actual] if not df.empty else pd.DataFrame()
-    piezas_producidas_total = df_oc_rem["piezas_producidas"].sum() if not df_oc_rem.empty else 0
-    piezas_almacen_rem = max(0, piezas_producidas_total - entregadas_actual)
-    
-    st.info(f"📦 **Estado de Almacén para `{oc_actual}`:** Total Producido: **{piezas_producidas_total} pzas** | Ya Entregadas: **{entregadas_actual} pzas** | Disponibles: **{piezas_almacen_rem} pzas**")
-
-    with st.form("form_remision"):
-        col1, col2 = st.columns(2)
-        with col1:
-            atencion = st.text_input("Atención", "Ing. Laura Zamora")
-            compania = st.text_input("Compañía", "Herwong")
-            puesto = st.text_input("Puesto", "Compras")
-            email = st.text_input("Email", "compras.herwong@gmail.com")
-            cel = st.text_input("Cel", "871-1442234")
-        with col2:
-            referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
-            fecha_remision = st.date_input("Fecha de emisión", datetime.now())
-            cantidad_piezas_entrega = st.number_input("Cantidad de piezas a entregar en esta remisión", min_value=1, value=max(1, int
+    st.subheader(f"📋 Historial y Ritmo
