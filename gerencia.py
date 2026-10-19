@@ -1,11 +1,9 @@
 import streamlit as st
-import streamlit as st
 import pandas as pd
 from datetime import datetime, date
-import calendar
 from supabase import create_client
 
-# Configuración de la página con la identidad corporativa de Crealag (Sistema de Supervisión)
+# Configuración de la página con la identidad corporativa de Crealag
 st.set_page_config(
     page_title="crealag - Sistema de Supervisión", 
     layout="wide", 
@@ -22,42 +20,31 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS - Paleta Oscura Corporativa Crealag (Diseño Blindado y Legible)
+# Estilos CSS - Paleta Oscura Ejecutiva Crealag
 st.markdown("""
     <style>
-    /* Fondo global azul noche muy oscuro */
     .stApp, [data-testid="stHeader"], [data-testid="stToolbar"] {
         background-color: #0A0F1D !important;
         color: #F8FAFC !important;
     }
-    
-    /* Barra lateral */
     [data-testid="stSidebar"] {
         background-color: #111B2E !important;
         border-right: 1px solid #1E293B !important;
     }
-    
-    /* Textos, títulos, etiquetas y párrafos generales en blanco/gris claro resaltado */
     h1, h2, h3, h4, h5, h6, p, span, label, div, .stMarkdown {
         color: #F8FAFC !important;
         font-weight: 700 !important;
     }
-    
-    /* Menús desplegables / Selects integrados al tema oscuro */
     div[data-baseweb="select"] > div {
         background-color: #1A263D !important;
         color: #F8FAFC !important;
         border: 1px solid #2D3E5E !important;
         border-radius: 8px !important;
-        font-size: 16px !important;
-        font-weight: 700 !important;
     }
     [data-baseweb="popover"], [data-baseweb="menu"] {
         background-color: #111B2E !important;
         color: #F8FAFC !important;
     }
-    
-    /* Botones corporativos en dorado sobrio metálico */
     button, .stButton > button, [data-testid="baseButton-primary"], div.stButton > button {
         background: linear-gradient(135deg, #2D2412 0%, #1A160A 100%) !important;
         color: #F8FAFC !important;
@@ -66,21 +53,7 @@ st.markdown("""
         font-size: 16px !important;
         font-weight: 800 !important;
         padding: 10px 20px !important;
-        transition: all 0.2s ease !important;
     }
-    button *, .stButton > button *, [data-testid="baseButton-primary"] *, div.stButton > button * {
-        color: #F8FAFC !important;
-        font-size: 16px !important;
-        font-weight: 800 !important;
-    }
-    
-    button:hover, .stButton > button:hover, [data-testid="baseButton-primary"]:hover, div.stButton > button:hover {
-        background: linear-gradient(135deg, #3D311A 0%, #2A2210 100%) !important;
-        border-color: #F59E0B !important;
-        color: #FFFFFF !important;
-    }
-
-    /* Métricas con números y etiquetas resaltadas */
     [data-testid="stMetricValue"] {
         color: #F8FAFC !important;
         font-weight: 800 !important;
@@ -89,18 +62,12 @@ st.markdown("""
     [data-testid="stMetricLabel"] {
         color: #94A3B8 !important;
         font-weight: 700 !important;
-        font-size: 16px !important;
     }
-    
-    /* Marca Crealag */
     .brand-title {
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
         font-weight: 800 !important;
-        letter-spacing: -1px;
         color: #F8FAFC !important;
     }
-    
-    /* Tarjeta de bienvenida */
     .welcome-card {
         background: #111B2E;
         border: 1px solid #1E293B;
@@ -109,6 +76,14 @@ st.markdown("""
         text-align: center;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         margin-top: 30px;
+    }
+    .timeline-card {
+        background-color: #111B2E;
+        border: 1px solid #2D3E5E;
+        border-left: 4px solid #D4AF37;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -181,7 +156,7 @@ if st.session_state.orden_seleccionada is None:
         else:
             st.warning("No hay Órdenes de Compra activas en el sistema.")
 
-# --- PANTALLA 2: DATOS EN TIEMPO REAL Y CALENDARIO ---
+# --- PANTALLA 2: DATOS EN TIEMPO REAL ---
 else:
     oc_actual = st.session_state.orden_seleccionada
     
@@ -213,66 +188,52 @@ else:
 
     st.markdown("---")
 
-    # --- CALENDARIO VISUAL OSCURO ---
-    st.markdown(f"### 📅 Calendario de Producción - `{oc_actual}`")
+    # --- NUEVA VISTA: RITMO Y REGISTRO DIARIO DE PRODUCCIÓN ---
+    st.markdown(f"### 📈 Histórico y Ritmo Diario de Producción - `{oc_actual}`")
 
     if not df_oc_prod.empty:
         df_oc_prod['fecha_dt'] = pd.to_datetime(df_oc_prod['fecha'])
-        df_diario = df_oc_prod.groupby(df_oc_prod['fecha_dt'].dt.date)['piezas_producidas'].sum().to_dict()
-        
-        fechas_disponibles = sorted(list(df_diario.keys()))
-        min_fecha = fechas_disponibles[0] if fechas_disponibles else date.today()
-        
-        col_sel1, col_sel2 = st.columns(2)
-        with col_sel1:
-            anio_sel = st.selectbox("Año:", sorted(list(set([f.year for f in fechas_disponibles]))), index=0)
-        with col_sel2:
-            meses_nombres = {1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio", 
-                             7: "Julio", 8: "Agosto", 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"}
-            mes_sel = st.selectbox("Mes:", options=list(meses_nombres.keys()), format_func=lambda x: meses_nombres[x], index=min_fecha.month - 1 if min_fecha.year == anio_sel else 0)
+        df_resumen_diario = df_oc_prod.groupby('fecha_dt', as_index=False)['piezas_producidas'].sum().sort_values(by='fecha_dt', ascending=False)
+        df_resumen_diario['fecha_formateada'] = df_resumen_diario['fecha_dt'].dt.strftime('%A, %d de %B de %Y')
 
-        cols_header = st.columns(7)
-        dias_semana_nombres = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
-        for idx, d_nombre in enumerate(dias_semana_nombres):
-            cols_header[idx].markdown(f"**<div style='text-align: center; color: #94A3B8 !important; font-size: 16px; font-weight: 700;'>{d_nombre}</div>**", unsafe_allow_html=True)
+        # Gráfico de barras horizontal nativo y limpio
+        st.bar_chart(
+            data=df_resumen_diario.set_index('fecha_dt')['piezas_producidas'],
+            use_container_width=True,
+            color="#D4AF37"
+        )
 
         st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 📋 Detalle de Días con Producción Activa")
 
-        cal = calendar.Calendar(firstweekday=0)
-        dias_mes = cal.monthdayscalendar(anio_sel, mes_sel)
+        # Tarjetas ejecutivas por cada día registrado
+        for _, row in df_resumen_diario.iterrows():
+            f_str = row['fecha_dt'].strftime('%d/%m/%Y')
+            pzas_dia = int(row['piezas_producidas'])
+            
+            c_d1, c_d2 = st.columns([3, 1])
+            with c_d1:
+                st.markdown(f"""
+                    <div class="timeline-card">
+                        <span style="color: #94A3B8; font-size: 14px;">FECHA DE PRODUCCIÓN</span><br>
+                        <span style="color: #F8FAFC; font-size: 18px; font-weight: 800;">🗓️ {f_str}</span>
+                    </div>
+                """, unsafe_allow_html=True)
+            with c_d2:
+                st.markdown(f"""
+                    <div style="background-color: rgba(212, 175, 55, 0.15); border: 1px solid #D4AF37; border-radius: 8px; padding: 16px; text-align: center;">
+                        <span style="color: #D4AF37; font-size: 12px; font-weight: 800;">FABRICADO</span><br>
+                        <span style="color: #F8FAFC; font-size: 20px; font-weight: 800;">⚡ {pzas_dia} pzas</span>
+                    </div>
+                """, unsafe_allow_html=True)
 
-        for semana in dias_mes:
-            cols_semana = st.columns(7)
-            for idx, dia in enumerate(semana):
-                with cols_semana[idx]:
-                    if dia == 0:
-                        st.write("")
-                    else:
-                        fecha_curr = date(anio_sel, mes_sel, dia)
-                        pzas = df_diario.get(fecha_curr, 0)
-                        
-                        if pzas > 0:
-                            st.markdown(f"""
-                                <div style="background-color: rgba(212, 175, 55, 0.15); border: 1px solid #D4AF37; border-radius: 8px; padding: 10px; text-align: center;">
-                                    <div style="font-size: 16px; font-weight: bold; color: #F8FAFC !important;">{dia}</div>
-                                    <div style="background-color: #D4AF37; color: #0A0F1D !important; font-size: 11px; font-weight: bold; border-radius: 4px; padding: 2px 4px; margin-top: 4px;">⚡ {pzas} pzas</div>
-                                </div>
-                            """, unsafe_allow_html=True)
-                        else:
-                            st.markdown(f"""
-                                <div style="background-color: #111B2E; border: 1px solid #1E293B; border-radius: 8px; padding: 10px; text-align: center;">
-                                    <div style="font-size: 16px; font-weight: bold; color: #64748B !important;">{dia}</div>
-                                    <div style="font-size: 11px; color: #334155 !important; margin-top: 4px;">-</div>
-                                </div>
-                            """, unsafe_allow_html=True)
-
-        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("---")
-        csv_reporte_gen = df_oc_prod.groupby('fecha', as_index=False)['piezas_producidas'].sum().to_csv(index=False).encode('utf-8')
+        csv_reporte_gen = df_resumen_diario[['fecha_dt', 'piezas_producidas']].to_csv(index=False).encode('utf-8')
         st.download_button(
             label="📥 Descargar Reporte Consolidado (CSV)",
             data=csv_reporte_gen,
-            file_name=f"Reporte_Calendario_{oc_actual}.csv",
+            file_name=f"Reporte_Produccion_{oc_actual}.csv",
             mime="text/csv"
         )
     else:
