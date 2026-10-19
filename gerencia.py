@@ -20,7 +20,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS - Paleta Oscura Ejecutiva Crealag (Sintaxis simplificada para evitar errores)
+# Estilos CSS - Paleta Oscura Ejecutiva Crealag
 css_estilos = """
 <style>
 .stApp, [data-testid="stHeader"], [data-testid="stToolbar"] {
@@ -186,4 +186,25 @@ else:
 
     if not df_oc_prod.empty:
         df_oc_prod['fecha_dt'] = pd.to_datetime(df_oc_prod['fecha'])
-        df_resumen
+        df_resumen_diario = df_oc_prod.groupby('fecha_dt', as_index=False)['piezas_producidas'].sum().sort_values(by='fecha_dt', ascending=False)
+        df_resumen_diario['Fecha'] = df_resumen_diario['fecha_dt'].dt.strftime('%d / %m / %Y')
+        df_resumen_diario['Piezas Fabricadas'] = df_resumen_diario['piezas_producidas'].apply(lambda x: f"{x} pzas")
+
+        # Tabla de ancho fijo estático
+        st.dataframe(
+            df_resumen_diario[['Fecha', 'Piezas Fabricadas']],
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("---")
+        csv_reporte_gen = df_resumen_diario[['Fecha', 'piezas_producidas']].rename(columns={'piezas_producidas': 'Piezas'}).to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Descargar Reporte Consolidado (CSV)",
+            data=csv_reporte_gen,
+            file_name=f"Reporte_Produccion_{oc_actual}.csv",
+            mime="text/csv"
+        )
+    else:
+        st.info("Aún no hay registros de producción para esta orden en la base de datos.")
