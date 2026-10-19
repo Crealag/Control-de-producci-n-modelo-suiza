@@ -23,12 +23,12 @@ SUPABASE_KEY = "sb_publishable_D79R2pyWt6LI3lggygrbjg_4oJmoEX_"
 def init_supabase():
     try:
         return create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
+    except Exception:
         return None
 
 supabase = init_supabase()
 
-# Estilos CSS - Paleta Oscura Neutra y Estable
+# Estilos CSS - Paleta Oscura Neutra y Elegante
 css_estilos = """
 <style>
 .stApp { background-color: #0A0F1D; color: #F8FAFC; }
@@ -36,7 +36,7 @@ css_estilos = """
 div[data-baseweb="input"], div[data-baseweb="select"], div[data-baseweb="base-input"] {
     background-color: #1A263D !important; color: #F8FAFC !important; border-color: #334155 !important;
 }
-button, .stButton>button, [data-testid="baseButton-primary"] {
+button, .stButton>button, [data-testid="baseButton-primary"], div.stButton>button {
     background-color: #1E293B !important;
     color: #F8FAFC !important;
     border: 1px solid #334155 !important;
@@ -290,6 +290,34 @@ if menu_seleccionado == "📊 Producción y Registro":
 
     if estado_oc != "Cerrada":
         st.subheader("➕ Registrar Piezas Producidas")
-        tipo_captura = st.radio("Modo de registro:", ["Rápido / Actual", "Pasado (Fecha/Hora)"], horizontal=True)
-        piezas_sumar = 0
-        fecha_registro = datetime.now
+        
+        with st.form("form_registro_produccion"):
+            col_p1, col_p2 = st.columns([1, 2])
+            with col_p1:
+                cantidad_piezas_in = st.number_input("Cantidad de Piezas:", min_value=1, value=10, step=1)
+            with col_p2:
+                obs_in = st.text_input("Observaciones del Turno:", placeholder="Ej. Avance turno mañana...")
+            
+            col_d1, col_d2 = st.columns(2)
+            fecha_in = col_d1.date_input("Fecha de Registro:", value=date.today())
+            hora_in = col_d2.time_input("Hora de Registro:", value=datetime.now().time())
+            
+            btn_registrar = st.form_submit_button("⚡ Registrar Piezas Producidas", type="primary", use_container_width=True)
+            if btn_registrar:
+                f_str = fecha_in.strftime("%Y-%m-%d")
+                h_str = hora_in.strftime("%H:%M:%S")
+                insertar_registro(oc_actual, f_str, h_str, cantidad_piezas_in, obs_in if obs_in else "Sin observaciones")
+                st.success(f"✅ ¡Registradas {cantidad_piezas_in} piezas!")
+                st.rerun()
+
+    st.markdown("---")
+    st.subheader(f"📋 Historial y Ritmo de Producción - {oc_actual}")
+    
+    if not df_oc.empty:
+        df_grafica = df_oc.copy()
+        df_grafica['fecha_str'] = df_grafica['fecha'].astype(str)
+        df_diario = df_grafica.groupby('fecha_str', as_index=False)['piezas_producidas'].sum().sort_values('fecha_str')
+        df_diario.columns = ['Fecha', 'Piezas Producidas']
+        
+        st.markdown("#### 📊 Producción Diaria Acumulada")
+        st.bar_chart(df_diario, x='Fecha', y='Piezas Producidas', use_container_
