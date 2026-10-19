@@ -28,7 +28,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS - Paleta Oscura Neutra
+# Estilos CSS - Paleta Oscura Neutra y Elegante
 css_estilos = """
 <style>
 .stApp { background-color: #0A0F1D; color: #F8FAFC; }
@@ -319,8 +319,8 @@ if menu_seleccionado == "📊 Producción y Registro":
         df_diario = df_grafica.groupby('fecha_str', as_index=False)['piezas_producidas'].sum().sort_values('fecha_str')
         df_diario.columns = ['Fecha', 'Piezas Producidas']
         
-        st.markdown("#### 📊 Producción Diaria Acumulada")
-        st.bar_chart(df_diario, x='Fecha', y='Piezas Producidas', use_container_width=True)
+        st.markdown("#### 📊 Ritmo de Producción Diaria (Tendencia)")
+        st.line_chart(df_diario, x='Fecha', y='Piezas Producidas', use_container_width=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("#### 📄 Registros Detallados")
