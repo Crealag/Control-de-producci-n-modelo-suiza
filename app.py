@@ -305,9 +305,10 @@ if menu_seleccionado == "📊 Producción y Registro":
             btn_registrar = st.form_submit_button("⚡ Registrar Piezas Producidas", type="primary", use_container_width=True)
             if btn_registrar:
                 f_str = fecha_in.strftime("%Y-%m-%d")
-                h_str = hora_in.strftime("%H:%M:%S")
+                # Formato de hora AM / PM (ejemplo: 07:11 PM)
+                h_str = hora_in.strftime("%I:%M %p")
                 insertar_registro(oc_actual, f_str, h_str, cantidad_piezas_in, obs_in if obs_in else "Sin observaciones")
-                st.success(f"✅ ¡Registradas {cantidad_piezas_in} piezas!")
+                st.success(f"✅ ¡Registradas {cantidad_piezas_in} piezas a las {h_str}!")
                 st.rerun()
 
     st.markdown("---")
@@ -365,15 +366,4 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
         with col2:
             referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
             fecha_remision = st.date_input("Fecha de emisión", datetime.now())
-            cantidad_piezas_entrega = st.number_input("Cantidad de piezas a entregar en esta remisión", min_value=1, value=max(1, int(piezas_almacen_rem)))
-
-        fecha_recibido_str = st.text_input("Fecha de pedido recibido (Texto)", "08 de mayo de 2026")
-        sumar_a_entregadas = st.checkbox(" Descontar estas piezas de Almacén al generar remisión", value=True)
-        submit_pdf = st.form_submit_button("Generar PDF de Remisión Original", type="primary")
-
-    if submit_pdf:
-        if sumar_a_entregadas:
-            registrar_entrega_piezas(oc_actual, cantidad_piezas_entrega)
-        pdf_buffer = generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_actual, fecha_remision, cantidad_piezas_entrega, fecha_recibido_str)
-        st.success(f"¡Remisión por {cantidad_piezas_entrega} piezas generada con éxito y descontada del almacén!")
-        st.download_button(label="📥 Descargar Remisión en PDF", data=pdf_buffer, file_name="Remision.pdf", mime="application/pdf")
+            cantidad_piezas_entrega = st.number_input("Cantidad de piezas a entregar en esta remisión", min_value=1, value=max(1, int
