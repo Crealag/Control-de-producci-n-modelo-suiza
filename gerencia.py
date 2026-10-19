@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit as st
 import pandas as pd
 from datetime import datetime, date
 import calendar
@@ -21,82 +22,74 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS - Paleta Clara con Letras Más Grandes y en Negritas
+# Estilos CSS - Paleta Oscura Corporativa Crealag (Diseño Blindado y Legible)
 st.markdown("""
     <style>
-    /* Fondo global blanco suave */
+    /* Fondo global azul noche muy oscuro */
     .stApp, [data-testid="stHeader"], [data-testid="stToolbar"] {
-        background-color: #FFFFFF !important;
-        color: #0F172A !important;
+        background-color: #0A0F1D !important;
+        color: #F8FAFC !important;
     }
     
     /* Barra lateral */
     [data-testid="stSidebar"] {
-        background-color: #F8FAFC !important;
-        border-right: 1px solid #E2E8F0 !important;
+        background-color: #111B2E !important;
+        border-right: 1px solid #1E293B !important;
     }
     
-    /* Textos, títulos, etiquetas y párrafos generales (Más grandes y en negritas) */
+    /* Textos, títulos, etiquetas y párrafos generales en blanco/gris claro resaltado */
     h1, h2, h3, h4, h5, h6, p, span, label, div, .stMarkdown {
-        color: #0F172A !important;
+        color: #F8FAFC !important;
         font-weight: 700 !important;
     }
     
-    /* Estilo especial para etiquetas de campos de formulario y selectores */
-    label, p, span {
-        font-size: 17px !important;
-        font-weight: 700 !important;
-    }
-
-    /* Menús desplegables / Selects en tema claro */
+    /* Menús desplegables / Selects integrados al tema oscuro */
     div[data-baseweb="select"] > div {
-        background-color: #FFFFFF !important;
-        color: #0F172A !important;
-        border: 2px solid #94A3B8 !important;
+        background-color: #1A263D !important;
+        color: #F8FAFC !important;
+        border: 1px solid #2D3E5E !important;
         border-radius: 8px !important;
-        font-size: 18px !important;
-        font-weight: 800 !important;
+        font-size: 16px !important;
+        font-weight: 700 !important;
     }
     [data-baseweb="popover"], [data-baseweb="menu"] {
-        background-color: #FFFFFF !important;
-        color: #0F172A !important;
-        font-size: 18px !important;
-        font-weight: 700 !important;
+        background-color: #111B2E !important;
+        color: #F8FAFC !important;
     }
     
-    /* Botones corporativos sobrios con texto blanco, grande y en negritas */
+    /* Botones corporativos en dorado sobrio metálico */
     button, .stButton > button, [data-testid="baseButton-primary"], div.stButton > button {
-        background-color: #1E293B !important;
-        background-image: none !important;
-        color: #FFFFFF !important;
-        border: 1px solid #1E293B !important;
+        background: linear-gradient(135deg, #2D2412 0%, #1A160A 100%) !important;
+        color: #F8FAFC !important;
+        border: 1px solid #D4AF37 !important;
         border-radius: 8px !important;
-        font-size: 18px !important;
+        font-size: 16px !important;
         font-weight: 800 !important;
         padding: 10px 20px !important;
+        transition: all 0.2s ease !important;
     }
     button *, .stButton > button *, [data-testid="baseButton-primary"] *, div.stButton > button * {
-        color: #FFFFFF !important;
-        font-size: 18px !important;
+        color: #F8FAFC !important;
+        font-size: 16px !important;
         font-weight: 800 !important;
     }
     
     button:hover, .stButton > button:hover, [data-testid="baseButton-primary"]:hover, div.stButton > button:hover {
-        background-color: #0F172A !important;
-        border-color: #0F172A !important;
+        background: linear-gradient(135deg, #3D311A 0%, #2A2210 100%) !important;
+        border-color: #F59E0B !important;
         color: #FFFFFF !important;
     }
 
-    /* Métricas con números y etiquetas más grandes y resaltados */
+    /* Métricas con números y etiquetas resaltadas */
     [data-testid="stMetricValue"] {
-        color: #0F172A !important;
+        color: #F8FAFC !important;
         font-weight: 800 !important;
-        font-size: 32px !important;
+        font-size: 30px !important;
     }
     [data-testid="stMetricLabel"] {
-        color: #334155 !important;
-        font-weight: 800 !important;
-        font-size: 18px !important;
+        color: #94A3B8 !important;
+        font-weight: 700 !important;
+        font-size: 16px !important;
     }
     
     /* Marca Crealag */
@@ -104,17 +97,17 @@ st.markdown("""
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
         font-weight: 800 !important;
         letter-spacing: -1px;
-        color: #0F172A !important;
+        color: #F8FAFC !important;
     }
     
     /* Tarjeta de bienvenida */
     .welcome-card {
-        background: #F8FAFC;
-        border: 2px solid #CBD5E1;
+        background: #111B2E;
+        border: 1px solid #1E293B;
         border-radius: 12px;
         padding: 40px;
         text-align: center;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         margin-top: 30px;
     }
     </style>
@@ -152,7 +145,7 @@ if "orden_seleccionada" not in st.session_state:
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    st.markdown("<h2 class='brand-title' style='color: #B45309 !important; margin-bottom: 0px;'>crealag</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='brand-title' style='color: #D4AF37 !important; margin-bottom: 0px;'>crealag</h2>", unsafe_allow_html=True)
     st.caption("Sistema de Supervisión")
     st.markdown("---")
     st.success("🔒 **Solo Lectura**")
@@ -170,9 +163,9 @@ if st.session_state.orden_seleccionada is None:
     with col2:
         st.markdown("""
             <div class="welcome-card">
-                <h1 class="brand-title" style="color: #B45309 !important; font-size: 40px; margin-bottom: 10px; font-weight: 800;">crealag</h1>
-                <h2 style="color: #0F172A !important; font-weight: 800; margin-bottom: 20px; font-size: 26px;">Sistema de Supervisión</h2>
-                <p style="color: #334155 !important; font-size: 18px; font-weight: 700;">Seleccione la Orden de Compra que desea monitorear en tiempo real.</p>
+                <h1 class="brand-title" style="color: #D4AF37 !important; font-size: 38px; margin-bottom: 10px; font-weight: 800;">crealag</h1>
+                <h2 style="color: #F8FAFC !important; font-weight: 700; margin-bottom: 20px; font-size: 24px;">Sistema de Supervisión</h2>
+                <p style="color: #94A3B8 !important; font-size: 16px; font-weight: 600;">Seleccione la Orden de Compra que desea monitorear en tiempo real.</p>
             </div>
         """, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
@@ -192,7 +185,7 @@ if st.session_state.orden_seleccionada is None:
 else:
     oc_actual = st.session_state.orden_seleccionada
     
-    st.markdown(f"<h1 class='brand-title' style='font-size: 32px;'>crealag <span style='font-weight: 400; font-size: 26px; color: #475569 !important;'>| Orden de Compra: <b>{oc_actual}</b></span></h1>", unsafe_allow_html=True)
+    st.markdown(f"<h1 class='brand-title' style='font-size: 30px;'>crealag <span style='font-weight: 400; font-size: 24px; color: #94A3B8 !important;'>| Orden de Compra: <b>{oc_actual}</b></span></h1>", unsafe_allow_html=True)
     st.markdown("---")
 
     row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc[0] if not df_ocs_catalogo.empty and oc_actual in df_ocs_catalogo["orden_compra"].values else {"meta_piezas": 1700, "estado": "Activa", "piezas_entregadas": 0}
@@ -220,7 +213,7 @@ else:
 
     st.markdown("---")
 
-    # --- CALENDARIO VISUAL EN FONDO CLARO ---
+    # --- CALENDARIO VISUAL OSCURO ---
     st.markdown(f"### 📅 Calendario de Producción - `{oc_actual}`")
 
     if not df_oc_prod.empty:
@@ -241,7 +234,7 @@ else:
         cols_header = st.columns(7)
         dias_semana_nombres = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
         for idx, d_nombre in enumerate(dias_semana_nombres):
-            cols_header[idx].markdown(f"**<div style='text-align: center; color: #1E293B !important; font-size: 18px; font-weight: 800;'>{d_nombre}</div>**", unsafe_allow_html=True)
+            cols_header[idx].markdown(f"**<div style='text-align: center; color: #94A3B8 !important; font-size: 16px; font-weight: 700;'>{d_nombre}</div>**", unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
 
@@ -260,16 +253,16 @@ else:
                         
                         if pzas > 0:
                             st.markdown(f"""
-                                <div style="background-color: #FEF3C7; border: 2px solid #F59E0B; border-radius: 8px; padding: 12px; text-align: center;">
-                                    <div style="font-size: 18px; font-weight: 800; color: #78350F !important;">{dia}</div>
-                                    <div style="background-color: #D4AF37; color: #0A0F1D !important; font-size: 13px; font-weight: 800; border-radius: 4px; padding: 3px 6px; margin-top: 6px;">⚡ {pzas} pzas</div>
+                                <div style="background-color: rgba(212, 175, 55, 0.15); border: 1px solid #D4AF37; border-radius: 8px; padding: 10px; text-align: center;">
+                                    <div style="font-size: 16px; font-weight: bold; color: #F8FAFC !important;">{dia}</div>
+                                    <div style="background-color: #D4AF37; color: #0A0F1D !important; font-size: 11px; font-weight: bold; border-radius: 4px; padding: 2px 4px; margin-top: 4px;">⚡ {pzas} pzas</div>
                                 </div>
                             """, unsafe_allow_html=True)
                         else:
                             st.markdown(f"""
-                                <div style="background-color: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 12px; text-align: center;">
-                                    <div style="font-size: 18px; font-weight: 700; color: #64748B !important;">{dia}</div>
-                                    <div style="font-size: 13px; color: #CBD5E1 !important; margin-top: 6px;">-</div>
+                                <div style="background-color: #111B2E; border: 1px solid #1E293B; border-radius: 8px; padding: 10px; text-align: center;">
+                                    <div style="font-size: 16px; font-weight: bold; color: #64748B !important;">{dia}</div>
+                                    <div style="font-size: 11px; color: #334155 !important; margin-top: 4px;">-</div>
                                 </div>
                             """, unsafe_allow_html=True)
 
