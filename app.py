@@ -28,7 +28,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS - Paleta Oscura Neutra y Elegante
+# Estilos CSS - Paleta Oscura Neutra
 css_estilos = """
 <style>
 .stApp { background-color: #0A0F1D; color: #F8FAFC; }
@@ -253,9 +253,9 @@ if menu_seleccionado == "📊 Producción y Registro":
     piezas_almacen_actual = max(0, piezas_producidas_oc - entregadas_actual)
     porcentaje = min(1.0, piezas_producidas_oc / meta_actual) if meta_actual > 0 else 0.0
 
-    st.subheader(f"Panel de Control - Orden Activa: `{oc_actual}` ({estado_oc})")
+    st.subheader(f"Panel de Control - Orden Activa: {oc_actual} ({estado_oc})")
     
-    with st.expander(f"⚙️ Configurar / Ajustar Orden `{oc_actual}`"):
+    with st.expander(f"⚙️ Configurar / Ajustar Orden {oc_actual}"):
         with st.form("form_edit_oc"):
             st.markdown("#### Ajustar Datos de la Orden")
             col_m1, col_m2, col_m3 = st.columns(3)
@@ -266,7 +266,7 @@ if menu_seleccionado == "📊 Producción y Registro":
             btn_guardar_oc = st.form_submit_button("💾 Guardar Cambios en OC", type="primary")
             if btn_guardar_oc:
                 if actualizar_oc_supabase(oc_actual, meta_editada, estado_editado, entregadas_editadas):
-                    st.success(f"✅ OC `{oc_actual}` actualizada correctamente.")
+                    st.success(f"✅ OC {oc_actual} actualizada correctamente.")
                     st.rerun()
 
         st.markdown("---")
@@ -274,7 +274,7 @@ if menu_seleccionado == "📊 Producción y Registro":
         if st.button("⚠️ Eliminar esta Orden de Compra por Completo", key="btn_del_oc_main"):
             if len(lista_ocs) > 1:
                 if eliminar_oc_supabase(oc_actual):
-                    st.success(f"🗑️ OC `{oc_actual}` eliminada por completo.")
+                    st.success(f"🗑️ OC {oc_actual} eliminada por completo.")
                     st.rerun()
             else:
                 st.error("No puedes eliminar la última Orden de Compra registrada.")
@@ -311,4 +311,73 @@ if menu_seleccionado == "📊 Producción y Registro":
                 st.rerun()
 
     st.markdown("---")
-    st.subheader(f"📋 Historial y Ritmo
+    st.subheader(f"📋 Historial y Ritmo de Producción - {oc_actual}")
+    
+    if not df_oc.empty:
+        df_grafica = df_oc.copy()
+        df_grafica['fecha_str'] = df_grafica['fecha'].astype(str)
+        df_diario = df_grafica.groupby('fecha_str', as_index=False)['piezas_producidas'].sum().sort_values('fecha_str')
+        df_diario.columns = ['Fecha', 'Piezas Producidas']
+        
+        st.markdown("#### 📊 Ritmo de Producción Diaria (Tendencia)")
+        st.line_chart(df_diario, x='Fecha', y='Piezas Producidas', use_container_width=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 📄 Registros Detallados")
+        st.dataframe(df_oc.sort_values(by="id", ascending=False), use_container_width=True)
+        
+        with st.expander("✏️ Editar o Eliminar un Registro de Producción"):
+            id_sel = st.selectbox("Selecciona ID:", df_oc["id"].tolist())
+            row_sel = df_oc[df_oc["id"] == id_sel].iloc[0]
+            
+            c_e1, c_e2 = st.columns(2)
+            p_edit = c_e1.number_input("Piezas corregidas:", min_value=0, value=int(row_sel["piezas_producidas"]))
+            obs_edit = c_e2.text_input("Obs corregidas:", value=str(row_sel["observaciones_turno"]))
+            
+            cb1, cb2 = st.columns(2)
+            if cb1.button("💾 Guardar Cambios"):
+                actualizar_registro_supabase(id_sel, p_edit, obs_edit)
+                st.success("Actualizado")
+                st.rerun()
+            if cb2.button("🗑️ Eliminar Registro"):
+                eliminar_registro_supabase(id_sel)
+                st.success("Eliminado")
+                st.rerun()
+    else:
+        st.info("Aún no hay registros de producción para esta orden.")
+
+elif menu_seleccionado == "📄 Generador de Remisiones":
+    st.subheader("Generador de Remisiones Oficiales - Formato Original Crealag")
+    df_oc_rem = df[df["orden_compra"] == oc_actual] if not df.empty else pd.DataFrame()
+    piezas_producidas_total = df_oc_rem["piezas_producidas"].sum() if not df_oc_rem.empty else 0
+    piezas_almacen_rem = max(0, piezas_producidas_total - entregadas_actual)
+    
+    st.info(f"📦 **Estado de Almacén para `{oc_actual}`:** Total Producido: **{piezas_producidas_total} pzas** | Ya Entregadas: **{entregadas_actual} pzas** | Disponibles: **{piezas_almacen_rem} pzas**")
+
+    with st.form("form_remision"):
+        col1, col2 = st.columns(2)
+        with col1:
+            atencion = st.text_input("Atención", "Ing. Laura Zamora")
+            compania = st.text_input("Compañía", "Herwong")
+            puesto = st.text_input("Puesto", "Compras")
+            email = st.text_input("Email", "compras.herwong@gmail.com")
+            cel = st.text_input("Cel", "871-1442234")
+        with col2:
+            referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
+            fecha_remision = st.date_input("Fecha de emisión", datetime.now())
+            cantidad_piezas_entrega = st.number_input(
+                "Cantidad de piezas a entregar en esta remisión", 
+                min_value=1, 
+                value=max(1, int(piezas_almacen_rem))
+            )
+
+        fecha_recibido_str = st.text_input("Fecha de pedido recibido (Texto)", "08 de mayo de 2026")
+        sumar_a_entregadas = st.checkbox(" Descontar estas piezas de Almacén al generar remisión", value=True)
+        submit_pdf = st.form_submit_button("Generar PDF de Remisión Original", type="primary")
+
+    if submit_pdf:
+        if sumar_a_entregadas:
+            registrar_entrega_piezas(oc_actual, cantidad_piezas_entrega)
+        pdf_buffer = generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_actual, fecha_remision, cantidad_piezas_entrega, fecha_recibido_str)
+        st.success(f"¡Remisión por {cantidad_piezas_entrega} piezas generada con éxito y descontada del almacén!")
+        st.download_button(label="📥 Descargar Remisión en PDF", data=pdf_buffer, file_name="Remision.pdf", mime="application/pdf")
