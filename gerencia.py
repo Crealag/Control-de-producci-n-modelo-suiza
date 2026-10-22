@@ -23,12 +23,12 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- ESTILOS CSS DE ALTA GAMA (UI/UX EJECUTIVO) ---
+# --- ESTILOS CSS DE ALTA GAMA (UI/UX EJECUTIVO CENTRADO) ---
 css_estilos = """
 <style>
 .stApp { background-color: #050811; color: #F8FAFC; font-family: 'Inter', sans-serif; }
 div[data-baseweb="select"] { background-color: #0F172A !important; color: #F8FAFC !important; border-color: #334155 !important; border-radius: 10px; }
-.brand-title { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; color: #F8FAFC; letter-spacing: -0.5px; }
+.brand-title { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; color: #F8FAFC; letter-spacing: -0.5px; text-align: center; }
 
 [data-testid="stMetricValue"] { color: #F8FAFC !important; font-weight: 800 !important; font-size: 1.8rem !important; }
 [data-testid="stMetricLabel"] { color: #94A3B8 !important; font-weight: 600 !important; font-size: 0.85rem !important; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -43,31 +43,18 @@ div[data-baseweb="select"] { background-color: #0F172A !important; color: #F8FAF
     margin-bottom: 25px;
 }
 
-/* Banner de Bienvenida Premium */
+/* Banner de Bienvenida Premium Centrado */
 .welcome-hero {
     background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0B132B 100%);
     padding: 40px;
     border-radius: 20px;
-    border-left: 6px solid #38BDF8;
-    border-top: 1px solid rgba(255,255,255,0.05);
+    border-top: 6px solid #38BDF8;
+    border-left: 1px solid rgba(255,255,255,0.05);
     border-right: 1px solid rgba(255,255,255,0.05);
     border-bottom: 1px solid rgba(255,255,255,0.05);
-    margin-bottom: 30px;
+    margin-bottom: 25px;
     box-shadow: 0 15px 35px rgba(0,0,0,0.4);
-    position: relative;
-    overflow: hidden;
-}
-
-.welcome-hero::after {
-    content: "";
-    position: absolute;
-    top: -50px;
-    right: -50px;
-    width: 200px;
-    height: 200px;
-    background: radial-gradient(circle, rgba(56,189,248,0.1) 0%, rgba(0,0,0,0) 70%);
-    border-radius: 50%;
-    z-index: 1;
+    text-align: center;
 }
 
 .selector-container {
@@ -111,30 +98,54 @@ df = cargar_datos_supabase()
 df_ocs_catalogo = cargar_catalogo_ocs()
 lista_ocs = df_ocs_catalogo["orden_compra"].tolist() if not df_ocs_catalogo.empty else ["HC-0505"]
 
-# --- SELECTOR DE ORDEN EN CONTENEDOR ESTILIZADO ---
-st.markdown("<div class='selector-container'>", unsafe_allow_html=True)
-st.markdown("<p style='color: #38BDF8; font-weight: 600; font-size: 0.95rem; margin-bottom: 8px;'>🎯 SELECCIÓN DE ORDEN DE COMPRA</p>", unsafe_allow_html=True)
-opciones_selector = ["-- Selecciona una Orden de Compra --"] + lista_ocs
-seleccion = st.selectbox("", opciones_selector, label_visibility="collapsed")
-st.markdown("</div>", unsafe_allow_html=True)
+# Gestionar estado en session_state para la orden seleccionada
+if "oc_seleccionada" not in st.session_state:
+    st.session_state.oc_seleccionada = "-- Selecciona una Orden de Compra --"
 
-# --- SI NO HAY ORDEN SELECCIONADA: MOSTRAR BIENVENIDA Y DETENER ---
-if seleccion == "-- Selecciona una Orden de Compra --":
-    st.markdown("""
-    <div class="welcome-hero">
-        <div style="position: relative; z-index: 2;">
+# Si no hay orden seleccionada, mostramos la bienvenida arriba y el selector abajo en columnas centradas
+if st.session_state.oc_seleccionada == "-- Selecciona una Orden de Compra --":
+    col1, col_centro, col3 = st.columns([1, 2.2, 1])
+    with col_centro:
+        # 1. Bienvenida Arriba
+        st.markdown("""
+        <div class="welcome-hero">
             <span style="background-color: rgba(56, 189, 248, 0.15); color: #38BDF8; padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Panel Directivo</span>
-            <h2 style="color: #F8FAFC; margin: 15px 0 10px 0; font-size: 2rem; font-weight: 700;">¡Bienvenido al Portal Gerencial de Crealag!</h2>
-            <p style="color: #94A3B8; margin: 0; font-size: 1.05rem; line-height: 1.6; max-width: 900px;">
-                Plataforma centralizada para la supervisión en tiempo real del rendimiento de producción, control de inventario en almacén, entregas y trazabilidad de bitácoras operativas de piso. Por favor, selecciona una Orden de Compra arriba para comenzar.
+            <h2 style="color: #F8FAFC; margin: 15px 0 10px 0; font-size: 1.8rem; font-weight: 700;">¡Bienvenido al Portal Gerencial de Crealag!</h2>
+            <p style="color: #94A3B8; margin: 0; font-size: 0.95rem; line-height: 1.6;">
+                Plataforma centralizada para la supervisión en tiempo real del rendimiento de producción, control de inventario en almacén y bitácoras operativas de piso.
             </p>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+
+        # 2. Selector Abajo
+        st.markdown("<div class='selector-container'>", unsafe_allow_html=True)
+        st.markdown("<p style='color: #38BDF8; font-weight: 600; font-size: 0.95rem; margin-bottom: 8px; text-align: center;'>🎯 SELECCIONA LA ORDEN DE COMPRA A CONSULTAR</p>", unsafe_allow_html=True)
+        
+        def actualizar_seleccion():
+            st.session_state.oc_seleccionada = st.session_state.widget_selector
+
+        opciones_selector = ["-- Selecciona una Orden de Compra --"] + lista_ocs
+        st.selectbox("", opciones_selector, key="widget_selector", on_change=actualizar_seleccion, label_visibility="collapsed")
+        st.markdown("</div>", unsafe_allow_html=True)
+    
     st.stop()
 
-# --- DESGLOSE DE INFORMACIÓN AL SELECCIONAR UNA ORDEN ---
-oc_actual = seleccion
+# --- SI YA SE SELECCIONÓ UNA ORDEN: LA BIENVENIDA DESAPARECE Y SE MUESTRA EL CONTENIDO ---
+oc_actual = st.session_state.oc_seleccionada
+
+# Selector compacto superior para permitir cambiar de orden si se desea
+col_s1, col_s2, col_s3 = st.columns([1, 2, 1])
+with col_s2:
+    opciones_selector = ["-- Selecciona una Orden de Compra --"] + lista_ocs
+    nuevo_cambio = st.selectbox("Cambiar Orden de Compra:", opciones_selector, index=opciones_selector.index(oc_actual) if oc_actual in opciones_selector else 0, key="widget_cambio")
+    if nuevo_cambio != "-- Selecciona una Orden de Compra --" and nuevo_cambio != oc_actual:
+        st.session_state.oc_seleccionada = nuevo_cambio
+        st.rerun()
+    elif nuevo_cambio == "-- Selecciona una Orden de Compra --":
+        st.session_state.oc_seleccionada = "-- Selecciona una Orden de Compra --"
+        st.rerun()
+
+st.markdown("<hr style='border-color: #1E293B; margin: 25px 0;'>", unsafe_allow_html=True)
 
 try:
     row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc[0]
@@ -145,8 +156,6 @@ except Exception:
     meta_actual = 1700
     estado_oc = "Activa"
     entregadas_actual = 0
-
-st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
 if not df.empty and "orden_compra" in df.columns:
     df_oc = df[df["orden_compra"] == oc_actual].copy()
