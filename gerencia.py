@@ -43,7 +43,6 @@ def cargar_datos_supabase():
         res = supabase.table("Producción").select("*").execute()
         return pd.DataFrame(res.data) if res.data else pd.DataFrame(columns=["id", "orden_compra", "fecha", "hora", "piezas_producidas", "observaciones_turno"])
     except Exception as e:
-        st.warning(f"No se pudo cargar la tabla 'Producción': {e}")
         return pd.DataFrame(columns=["id", "orden_compra", "fecha", "hora", "piezas_producidas", "observaciones_turno"])
 
 def cargar_catalogo_ocs():
@@ -54,7 +53,7 @@ def cargar_catalogo_ocs():
         if res.data:
             return pd.DataFrame(res.data)
     except Exception as e:
-        st.warning(f"No se pudo cargar la tabla 'Órdenes_Compra': {e}")
+        pass
     return pd.DataFrame([{"orden_compra": "HC-0505", "meta_piezas": 1700, "estado": "Activa", "piezas_entregadas": 0}])
 
 # --- VISTA GERENCIAL ---
@@ -64,11 +63,7 @@ st.markdown("---")
 df = cargar_datos_supabase()
 df_ocs_catalogo = cargar_catalogo_ocs()
 
-if not df_ocs_catalogo.empty and "orden_compra" in df_ocs_catalogo.columns:
-    lista_ocs = df_ocs_catalogo["orden_compra"].tolist()
-else:
-    lista_ocs = ["HC-0505"]
-
+lista_ocs = df_ocs_catalogo["orden_compra"].tolist() if not df_ocs_catalogo.empty else ["HC-0505"]
 oc_actual = st.selectbox("Seleccionar Orden de Compra:", lista_ocs)
 
 # Obtener datos de la OC seleccionada
@@ -91,7 +86,7 @@ if not df.empty and "orden_compra" in df.columns:
     piezas_almacen_actual = max(0, total_piezas_oc - entregadas_actual)
     porcentaje = min(1.0, total_piezas_oc / meta_actual) if meta_actual > 0 else 0.0
     
-    # --- MÉTRICAS EXACTAS Y BARRA DE PROGRESO ---
+    # --- MÉTRICAS Y BARRA DE PROGRESO ---
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Meta Estimada OC", f"{meta_actual} pzas")
     m2.metric("Producido Total", f"{total_piezas_oc} pzas")
@@ -101,11 +96,13 @@ if not df.empty and "orden_compra" in df.columns:
     st.progress(porcentaje)
     st.markdown("---")
     
-    st.subheader(f"📅 Bitácora Resumida Diaria - {oc_actual} ({estado_oc})")
+    st.subheader(f"📅 Bitácora Gerencial Diaria - {oc_actual} ({estado_oc})")
     
     fechas_todas = sorted(df_oc["fecha"].astype(str).unique(), reverse=True)
     
     if fechas_todas:
+        # Construir una lista consolidada por día para mostrar en formato de tabla limpia
+        datos_tabla = []
         for f in fechas_todas:
             df_todos_dia = df_oc[df_oc["fecha"].astype(str) == f]
             piezas_dia = df_todos_dia["piezas_producidas"].sum()
@@ -118,15 +115,27 @@ if not df.empty and "orden_compra" in df.columns:
             if not df_obs_dia.empty:
                 notas_resumidas = " | ".join(df_obs_dia["observaciones_turno"].tolist())
             else:
-                notas_resumidas = "Operación normal (Sin incidencias reportadas)"
+                notas_resumidas = "Operación normal (Sin incidencias)"
             
-            st.markdown(f"""
-            <div style="background-color: #111B2E; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 12px;">
-                <div style="font-size: 16px; font-weight: bold; color: #F8FAFC; margin-bottom: 4px;">📅 Fecha: {f}</div>
-                <div style="color: #94A3B8; font-size: 14px; margin-bottom: 4px;">📦 Producción total del día: <b style="color: #F8FAFC;">{piezas_dia} pzas</b></div>
-                <div style="color: #E2E8F0; font-size: 14px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            datos_tabla.append({
+                "Fecha": f,
+                "Producción Diaria": f"{piezas_dia} pzas",
+                "Novedades / Motivo": notas_resumidas
+            })
+        
+        df_resumen_gerencia = pd.DataFrame(datos_tabla)
+        
+        # Mostrar como una tabla interactiva de Streamlit (limpia, ordenada y sin cajas largas)
+        st.dataframe(
+            df_resumen_gerencia, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "Fecha": st.column_config.TextColumn("📅 Fecha", width="medium"),
+                "Producción Diaria": st.column_config.TextColumn("📦 Producción del Día", width="medium"),
+                "Novedades / Motivo": st.column_config.TextColumn("📝 Novedades / Motivos de Desviación", width="large"),
+            }
+        )
     else:
         st.success("🎉 No hay registros de producción para esta orden.")
 else:
