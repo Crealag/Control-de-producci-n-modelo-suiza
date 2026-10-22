@@ -58,7 +58,7 @@ def cargar_catalogo_ocs():
     return pd.DataFrame([{"orden_compra": "HC-0505", "meta_piezas": 1700, "estado": "Activa", "piezas_entregadas": 0}])
 
 # --- VISTA GERENCIAL ---
-st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Resumen Gerencial por Fechas</span></h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Resumen Gerencial Ejecutivo</span></h1>", unsafe_allow_html=True)
 st.markdown("---")
 
 df = cargar_datos_supabase()
@@ -100,34 +100,69 @@ if not df.empty and "orden_compra" in df.columns:
     if not df_oc.empty:
         df_oc['fecha_dt'] = pd.to_datetime(df_oc['fecha'])
         
-        # Calcular el inicio (Lunes) y fin (Domingo) de cada semana automáticamente
+        # Calcular el inicio (Lunes) y fin (Domingo) de cada semana
         df_oc['inicio_semana'] = df_oc['fecha_dt'] - pd.to_timedelta(df_oc['fecha_dt'].dt.dayofweek, unit='d')
         df_oc['fin_semana'] = df_oc['inicio_semana'] + pd.to_timedelta(6, unit='d')
         
-        # Crear etiqueta con rangos de fechas claros (Ej: "Del 19/10/2026 al 25/10/2026")
+        # Etiqueta de rango de fechas
         df_oc['semana_label'] = (
             "Del " + df_oc['inicio_semana'].dt.strftime('%d/%m/%Y') + 
             " al " + df_oc['fin_semana'].dt.strftime('%d/%m/%Y')
         )
         
-        # Detectar la semana actual para seleccionarla por defecto
+        # Ordenar cronológicamente para el carrusel de semanas
+        df_semanas_ordenadas = df_oc[['semana_label', 'inicio_semana']].drop_duplicates().sort_values('inicio_semana')
+        semanas_disponibles = df_semanas_ordenadas['semana_label'].tolist()
+        
+        # Detectar la semana actual
         hoy = pd.Timestamp(date.today())
         inicio_hoy = hoy - pd.to_timedelta(hoy.dayofweek, unit='d')
         fin_hoy = inicio_hoy + pd.to_timedelta(6, unit='d')
         etiqueta_actual = f"Del {inicio_hoy.strftime('%d/%m/%Y')} al {fin_hoy.strftime('%d/%m/%Y')}"
         
-        semanas_disponibles = sorted(df_oc['semana_label'].unique(), reverse=True)
+        # Manejar índice del carrusel en st.session_state
+        if 'semana_idx' not in st.session_state or st.session_state.get('oc_anterior') != oc_actual:
+            st.session_state.oc_anterior = oc_actual
+            if etiqueta_actual in semanas_disponibles:
+                st.session_state.semana_idx = semanas_disponibles.index(etiqueta_actual)
+            else:
+                st.session_state.semana_idx = len(semanas_disponibles) - 1 # Última semana disponible
+
+        # Asegurar límites de índice válidos
+        if st.session_state.semana_idx >= len(semanas_disponibles):
+            st.session_state.semana_idx = len(semanas_disponibles) - 1
+        if st.session_state.semana_idx < 0:
+            st.session_state.semana_idx = 0
+
+        st.markdown("### 🗓️ Selector de Semana (Carrusel)")
         
-        default_idx = 0
-        if etiqueta_actual in semanas_disponibles:
-            default_idx = semanas_disponibles.index(etiqueta_actual)
+        # Diseño del Carrusel con Botones de Navegación Lateral [ < ] [ Semana ] [ > ]
+        c_btn1, c_lbl, c_btn2 = st.columns([1, 4, 1])
+        
+        with c_btn1:
+            if st.button("◀ Anterior", use_container_width=True):
+                if st.session_state.semana_idx > 0:
+                    st.session_state.semana_idx -= 1
+                    st.rerun()
+                    
+        with c_lbl:
+            semana_seleccionada = semanas_disponibles[st.session_state.semana_idx]
+            st.markdown(f"""
+            <div style="background-color: #1A263D; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #334155;">
+                <span style="color: #38bdf8; font-weight: bold; font-size: 16px;">📅 {semana_seleccionada}</span>
+            </div>
+            """, unsafe_allow_html=True)
             
-        st.subheader("📅 Filtrar Bitácora por Rango Semanal")
-        semana_seleccionada = st.selectbox("Selecciona el rango de fechas a revisar:", semanas_disponibles, index=default_idx)
-        
+        with c_btn2:
+            if st.button("Siguiente ▶", use_container_width=True):
+                if st.session_state.semana_idx < len(semanas_disponibles) - 1:
+                    st.session_state.semana_idx += 1
+                    st.rerun()
+
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(f"### 📋 Resumen del Periodo `{semana_seleccionada}` - {oc_actual} ({estado_oc})")
+        st.markdown(f"### 📋 Detalle y Novedades del Periodo - {oc_actual} ({estado_oc})")
         
+        # Filtrar datos de la semana activa en el carrusel
         df_semana = df_oc[df_oc['semana_label'] == semana_seleccionada]
         fechas_semana = sorted(df_semana["fecha"].astype(str).unique(), reverse=True)
         
