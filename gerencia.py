@@ -107,22 +107,8 @@ def cargar_catalogo_ocs():
 st.markdown("<h1 class='brand-title' style='font-size: 2.2rem;'>crealag <span style='font-weight: 300; font-size: 20px; color: #94A3B8;'>| Portal Gerencial Ejecutivo</span></h1>", unsafe_allow_html=True)
 st.markdown("<hr style='border-color: #1E293B; margin-top: 12px; margin-bottom: 30px;'>", unsafe_allow_html=True)
 
-# --- HERO / BANNER DE BIENVENIDA ---
-st.markdown("""
-<div class="welcome-hero">
-    <div style="position: relative; z-index: 2;">
-        <span style="background-color: rgba(56, 189, 248, 0.15); color: #38BDF8; padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Panel Directivo</span>
-        <h2 style="color: #F8FAFC; margin: 15px 0 10px 0; font-size: 2rem; font-weight: 700;">¡Bienvenido al Portal Gerencial de Crealag!</h2>
-        <p style="color: #94A3B8; margin: 0; font-size: 1.05rem; line-height: 1.6; max-width: 900px;">
-            Plataforma centralizada para la supervisión en tiempo real del rendimiento de producción, control de inventario en almacén, entregas y trazabilidad de bitácoras operativas de piso.
-        </p>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
 df = cargar_datos_supabase()
 df_ocs_catalogo = cargar_catalogo_ocs()
-
 lista_ocs = df_ocs_catalogo["orden_compra"].tolist() if not df_ocs_catalogo.empty else ["HC-0505"]
 
 # --- SELECTOR DE ORDEN EN CONTENEDOR ESTILIZADO ---
@@ -132,11 +118,22 @@ opciones_selector = ["-- Selecciona una Orden de Compra --"] + lista_ocs
 seleccion = st.selectbox("", opciones_selector, label_visibility="collapsed")
 st.markdown("</div>", unsafe_allow_html=True)
 
-# Si no ha seleccionado ninguna orden, detenemos la ejecución aquí (pantalla limpia y elegante)
+# --- SI NO HAY ORDEN SELECCIONADA: MOSTRAR BIENVENIDA Y DETENER ---
 if seleccion == "-- Selecciona una Orden de Compra --":
+    st.markdown("""
+    <div class="welcome-hero">
+        <div style="position: relative; z-index: 2;">
+            <span style="background-color: rgba(56, 189, 248, 0.15); color: #38BDF8; padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Panel Directivo</span>
+            <h2 style="color: #F8FAFC; margin: 15px 0 10px 0; font-size: 2rem; font-weight: 700;">¡Bienvenido al Portal Gerencial de Crealag!</h2>
+            <p style="color: #94A3B8; margin: 0; font-size: 1.05rem; line-height: 1.6; max-width: 900px;">
+                Plataforma centralizada para la supervisión en tiempo real del rendimiento de producción, control de inventario en almacén, entregas y trazabilidad de bitácoras operativas de piso. Por favor, selecciona una Orden de Compra arriba para comenzar.
+            </p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     st.stop()
 
-# --- DESGLOSE DE INFORMACIÓN AL SELECCIONAR ---
+# --- DESGLOSE DE INFORMACIÓN AL SELECCIONAR UNA ORDEN ---
 oc_actual = seleccion
 
 try:
