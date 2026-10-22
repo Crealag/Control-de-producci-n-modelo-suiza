@@ -9,7 +9,7 @@ st.set_page_config(
     page_icon="🏢"
 )
 
-# --- CREDENCIALES (Mismas de tu sistema) ---
+# --- CREDENCIALES ---
 SUPABASE_URL = "https://jdihosehcvvzxsbhnqvf.supabase.co"
 SUPABASE_KEY = "sb_publishable_D79R2pyWt6LI3lggygrbjg_4oJmoEX_"
 
@@ -36,7 +36,7 @@ div[data-baseweb="select"] {
 """
 st.markdown(css_estilos, unsafe_allow_html=True)
 
-# --- FUNCIÓN DE CARGA DE DATOS ---
+# --- FUNCIONES DE CARGA ---
 def cargar_datos_supabase():
     if not supabase:
         return pd.DataFrame(columns=["id", "orden_compra", "fecha", "hora", "piezas_producidas", "observaciones_turno"])
@@ -57,55 +57,64 @@ def cargar_catalogo_ocs():
         pass
     return ["HC-0505"]
 
-# --- VISTA PRINCIPAL DE GERENCIA ---
-st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Portal Gerencial - Bitácora y Novedades</span></h1>", unsafe_allow_html=True)
+# --- VISTA PRINCIPAL GERENCIAL ---
+st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Resumen Gerencial Diario</span></h1>", unsafe_allow_html=True)
 st.markdown("---")
 
 df = cargar_datos_supabase()
 lista_ocs = cargar_catalogo_ocs()
 
-# Selector de Orden de Compra en la parte superior
-oc_actual = st.selectbox("Seleccionar Orden de Compra a Revisar:", lista_ocs)
-
+oc_actual = st.selectbox("Seleccionar Orden de Compra:", lista_ocs)
 st.markdown("---")
 
 if not df.empty:
     df_oc = df[df["orden_compra"] == oc_actual]
     
-    # Filtrar solo las observaciones reales (excluyendo "Sin observaciones")
+    # Filtrar solo observaciones reales (excluyendo "Sin observaciones")
     df_obs = df_oc[
         df_oc["observaciones_turno"].notnull() & 
         (~df_oc["observaciones_turno"].str.strip().str.lower().isin(["sin observaciones", "sin observacion", ""]))
     ].copy()
     
-    total_reportes = len(df_obs)
+    total_incidencias = len(df_obs)
+    total_piezas_oc = df_oc["piezas_producidas"].sum() if not df_oc.empty else 0
     
-    # Métricas informativas para gerencia
-    col1, col2 = st.columns(2)
-    col1.metric("Orden de Compra en Revisión", oc_actual)
-    col2.metric("Total de Incidencias / Justificaciones", f"{total_reportes} reportes")
+    # Métricas superiores
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Orden Activa", oc_actual)
+    col2.metric("Total Producido", f"{total_piezas_oc} pzas")
+    col3.metric("Reportes / Incidencias", f"{total_incidencias}")
     
     st.markdown("---")
-    st.subheader(f"📋 Resumen Diario de Observaciones - {oc_actual}")
+    st.subheader(f"📅 Bitácora Resumida Diaria - {oc_actual}")
     
     if not df_obs.empty:
-        # Ordenar por fecha descendente
+        # Agrupar y resumir por fecha
         fechas_unicas = sorted(df_obs["fecha"].astype(str).unique(), reverse=True)
         
         for f in fechas_unicas:
-            st.markdown(f"### 📅 Fecha: `{f}`")
             df_dia = df_obs[df_obs["fecha"].astype(str) == f]
+            piezas_dia = df_dia["piezas_producidas"].sum()
             
-            for _, row in df_dia.iterrows():
-                hora_txt = f" a las {row['hora']}" if pd.notnull(row['hora']) and str(row['hora']).strip() else ""
-                st.info(f"📌 **{row['piezas_producidas']} pzas producidas**{hora_txt} — **Motivo:** {row['observaciones_turno']}")
-            st.markdown("<br>", unsafe_allow_html=True)
+            # Concatenar las notas del día en un solo resumen limpio
+            lista_notas = df_dia["observaciones_turno"].tolist()
+            notas_resumidas = " | ".join(lista_notas)
             
-        with st.expander("🔍 Ver Tabla Completa de Incidencias"):
-            df_tabla_ger = df_obs[["fecha", "hora", "piezas_producidas", "observaciones_turno"]].sort_values(by="fecha", ascending=False)
-            df_tabla_ger.columns = ["Fecha", "Hora", "Piezas Producidas", "Observación / Motivo"]
-            st.dataframe(df_tabla_ger, use_container_width=True)
+            # Tarjeta resumen diaria
+            st.markdown(f"""
+            <div style="background-color: #111B2E; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 12px;">
+                <div style="font-size: 16px; font-weight: bold; color: #F8FAFC; margin-bottom: 4px;">📅 Fecha: {f}</div>
+                <div style="color: #94A3B8; font-size: 14px; margin-bottom: 4px;">📦 Producción total del día: <b style="color: #F8FAFC;">{piezas_dia} pzas</b></div>
+                <div style="color: #E2E8F0; font-size: 14px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        with st.expander("🔍 Ver desglose detallado por turno"):
+            df_detalle = df_obs[["fecha", "hora", "piezas_producidas", "observaciones_turno"]].sort_values(by=["fecha", "hora"], ascending=False)
+            df_detalle.columns = ["Fecha", "Hora", "Piezas", "Observación"]
+            st.dataframe(df_detalle, use_container_width=True, hide_index=True)
     else:
-        st.success("🎉 No hay incidencias ni retrasos reportados para esta orden. Todos los registros se encuentran operando con normalidad.")
+        st.success("🎉 No hay incidencias ni retrasos reportados para esta orden. Todos los turnos han operado con normalidad.")
 else:
-    st.info("Aún no hay registros de producción en la base de datos.")
+    st.info("Aún no hay registros en la base de datos.")
