@@ -28,7 +28,7 @@ supabase = init_supabase()
 css_estilos = """
 <style>
 .stApp { background-color: #0A0F1D; color: #F8FAFC; }
-div[data-baseweb="select"] { background-color: #1A263D !important; color: #F8FAFC !important; border-color: #334155 !important; }
+div[data-baseweb="tab-list"] { background-color: #0A0F1D !important; }
 .brand-title { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; color: #F8FAFC; }
 [data-testid="stMetricValue"] { color: #F8FAFC !important; font-weight: 800 !important; }
 [data-testid="stMetricLabel"] { color: #94A3B8 !important; font-weight: 700 !important; }
@@ -58,137 +58,155 @@ def cargar_catalogo_ocs():
     return pd.DataFrame([{"orden_compra": "HC-0505", "meta_piezas": 1700, "estado": "Activa", "piezas_entregadas": 0}])
 
 # --- VISTA GERENCIAL ---
-st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Resumen Gerencial Ejecutivo</span></h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Portal Gerencial Ejecutivo</span></h1>", unsafe_allow_html=True)
 st.markdown("---")
 
 df = cargar_datos_supabase()
 df_ocs_catalogo = cargar_catalogo_ocs()
 
 lista_ocs = df_ocs_catalogo["orden_compra"].tolist() if not df_ocs_catalogo.empty else ["HC-0505"]
-oc_actual = st.selectbox("Seleccionar Orden de Compra:", lista_ocs)
 
-# Obtener datos de la OC seleccionada
-try:
-    row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc[0]
-    meta_actual = int(row_oc_info.get("meta_piezas", 1700))
-    estado_oc = str(row_oc_info.get("estado", "Activa"))
-    entregadas_actual = int(row_oc_info.get("piezas_entregadas", 0) if pd.notnull(row_oc_info.get("piezas_entregadas")) else 0)
-except Exception:
-    meta_actual = 1700
-    estado_oc = "Activa"
-    entregadas_actual = 0
+# Crear las pestañas: La primera es Bienvenida, y las siguientes son una por cada Orden de Compra
+nombres_pestanas = ["👋 Bienvenida / General"] + [f"📦 OC: {oc}" for oc in lista_ocs]
+pestanas = st.tabs(nombres_pestanas)
 
-st.markdown("---")
-
-if not df.empty and "orden_compra" in df.columns:
-    df_oc = df[df["orden_compra"] == oc_actual].copy()
+# --- PESTAÑA 1: BIENVENIDA Y GENERAL ---
+with pestanas[0]:
+    st.markdown("### ¡Bienvenido al Portal Gerencial de Crealag!")
+    st.write("Desde este espacio exclusivo para la dirección y gerencia, puedes supervisar el estatus de producción en tiempo real, consultar el volumen de piezas en almacén, entregas y revisar los reportes y novedades de piso sin necesidad de modificar registros operativos.")
     
-    total_piezas_oc = df_oc["piezas_producidas"].sum() if not df_oc.empty else 0
-    piezas_almacen_actual = max(0, total_piezas_oc - entregadas_actual)
-    porcentaje = min(1.0, total_piezas_oc / meta_actual) if meta_actual > 0 else 0.0
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.info("💡 **Instrucción:** Selecciona una de las pestañas superiores correspondientes a cada Orden de Compra para desglosar su avance y bitácora detallada.")
     
-    # --- MÉTRICAS Y BARRA DE PROGRESO ---
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Meta Estimada OC", f"{meta_actual} pzas")
-    m2.metric("Producido Total", f"{total_piezas_oc} pzas")
-    m3.metric("Entregadas / Remitidas", f"{entregadas_actual} pzas")
-    m4.metric("Disponibles en Almacén", f"{piezas_almacen_actual} pzas")
-    
-    st.progress(porcentaje)
-    st.markdown("---")
-    
-    if not df_oc.empty:
-        df_oc['fecha_dt'] = pd.to_datetime(df_oc['fecha'])
-        
-        # Calcular el inicio (Lunes) y fin (Domingo) de cada semana
-        df_oc['inicio_semana'] = df_oc['fecha_dt'] - pd.to_timedelta(df_oc['fecha_dt'].dt.dayofweek, unit='d')
-        df_oc['fin_semana'] = df_oc['inicio_semana'] + pd.to_timedelta(6, unit='d')
-        
-        # Etiqueta de rango de fechas
-        df_oc['semana_label'] = (
-            "Del " + df_oc['inicio_semana'].dt.strftime('%d/%m/%Y') + 
-            " al " + df_oc['fin_semana'].dt.strftime('%d/%m/%Y')
-        )
-        
-        # Ordenar cronológicamente para el carrusel de semanas
-        df_semanas_ordenadas = df_oc[['semana_label', 'inicio_semana']].drop_duplicates().sort_values('inicio_semana')
-        semanas_disponibles = df_semanas_ordenadas['semana_label'].tolist()
-        
-        # Detectar la semana actual
-        hoy = pd.Timestamp(date.today())
-        inicio_hoy = hoy - pd.to_timedelta(hoy.dayofweek, unit='d')
-        fin_hoy = inicio_hoy + pd.to_timedelta(6, unit='d')
-        etiqueta_actual = f"Del {inicio_hoy.strftime('%d/%m/%Y')} al {fin_hoy.strftime('%d/%m/%Y')}"
-        
-        # Manejar índice del carrusel en st.session_state
-        if 'semana_idx' not in st.session_state or st.session_state.get('oc_anterior') != oc_actual:
-            st.session_state.oc_anterior = oc_actual
-            if etiqueta_actual in semanas_disponibles:
-                st.session_state.semana_idx = semanas_disponibles.index(etiqueta_actual)
-            else:
-                st.session_state.semana_idx = len(semanas_disponibles) - 1
+    # Resumen rápido general de todas las órdenes activas
+    if not df_ocs_catalogo.empty:
+        st.markdown("#### 📊 Estado General de Órdenes")
+        st.dataframe(df_ocs_catalogo, use_container_width=True, hide_index=True)
 
-        if st.session_state.semana_idx >= len(semanas_disponibles):
-            st.session_state.semana_idx = len(semanas_disponibles) - 1
-        if st.session_state.semana_idx < 0:
-            st.session_state.semana_idx = 0
+# --- PESTAÑAS 2 EN ADELANTE: UNA POR CADA ORDEN DE COMPRA ---
+for idx, oc_actual in enumerate(lista_ocs):
+    with pestanas[idx + 1]:
+        # Obtener datos de la OC seleccionada
+        try:
+            row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc[0]
+            meta_actual = int(row_oc_info.get("meta_piezas", 1700))
+            estado_oc = str(row_oc_info.get("estado", "Activa"))
+            entregadas_actual = int(row_oc_info.get("piezas_entregadas", 0) if pd.notnull(row_oc_info.get("piezas_entregadas")) else 0)
+        except Exception:
+            meta_actual = 1700
+            estado_oc = "Activa"
+            entregadas_actual = 0
 
-        st.markdown("### Selector de Semana")
-        
-        c_btn1, c_lbl, c_btn2 = st.columns([1, 4, 1])
-        
-        with c_btn1:
-            if st.button("◀ Anterior", use_container_width=True):
-                if st.session_state.semana_idx > 0:
-                    st.session_state.semana_idx -= 1
-                    st.rerun()
-                    
-        with c_lbl:
-            semana_seleccionada = semanas_disponibles[st.session_state.semana_idx]
-            st.markdown(f"""
-            <div style="background-color: #1A263D; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #334155;">
-                <span style="color: #38bdf8; font-weight: bold; font-size: 16px;">📅 {semana_seleccionada}</span>
-            </div>
-            """, unsafe_allow_html=True)
+        if not df.empty and "orden_compra" in df.columns:
+            df_oc = df[df["orden_compra"] == oc_actual].copy()
             
-        with c_btn2:
-            if st.button("Siguiente ▶", use_container_width=True):
-                if st.session_state.semana_idx < len(semanas_disponibles) - 1:
-                    st.session_state.semana_idx += 1
-                    st.rerun()
+            total_piezas_oc = df_oc["piezas_producidas"].sum() if not df_oc.empty else 0
+            piezas_almacen_actual = max(0, total_piezas_oc - entregadas_actual)
+            porcentaje = min(1.0, total_piezas_oc / meta_actual) if meta_actual > 0 else 0.0
+            
+            # --- MÉTRICAS Y BARRA DE PROGRESO ---
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Meta Estimada OC", f"{meta_actual} pzas")
+            m2.metric("Producido Total", f"{total_piezas_oc} pzas")
+            m3.metric("Entregadas / Remitidas", f"{entregadas_actual} pzas")
+            m4.metric("Disponibles en Almacén", f"{piezas_almacen_actual} pzas")
+            
+            st.progress(porcentaje)
+            st.markdown("---")
+            
+            if not df_oc.empty:
+                df_oc['fecha_dt'] = pd.to_datetime(df_oc['fecha'])
+                
+                # Calcular el inicio (Lunes) y fin (Domingo) de cada semana
+                df_oc['inicio_semana'] = df_oc['fecha_dt'] - pd.to_timedelta(df_oc['fecha_dt'].dt.dayofweek, unit='d')
+                df_oc['fin_semana'] = df_oc['inicio_semana'] + pd.to_timedelta(6, unit='d')
+                
+                # Etiqueta de rango de fechas
+                df_oc['semana_label'] = (
+                    "Del " + df_oc['inicio_semana'].dt.strftime('%d/%m/%Y') + 
+                    " al " + df_oc['fin_semana'].dt.strftime('%d/%m/%Y')
+                )
+                
+                df_semanas_ordenadas = df_oc[['semana_label', 'inicio_semana']].drop_duplicates().sort_values('inicio_semana')
+                semanas_disponibles = df_semanas_ordenadas['semana_label'].tolist()
+                
+                # Detectar la semana actual
+                hoy = pd.Timestamp(date.today())
+                inicio_hoy = hoy - pd.to_timedelta(hoy.dayofweek, unit='d')
+                fin_hoy = inicio_hoy + pd.to_timedelta(6, unit='d')
+                etiqueta_actual = f"Del {inicio_hoy.strftime('%d/%m/%Y')} al {fin_hoy.strftime('%d/%m/%Y')}"
+                
+                # Manejar índice del carrusel por cada orden en st.session_state
+                key_idx = f"semana_idx_{oc_actual}"
+                key_oc = f"oc_anterior_{oc_actual}"
+                
+                if key_idx not in st.session_state:
+                    if etiqueta_actual in semanas_disponibles:
+                        st.session_state[key_idx] = semanas_disponibles.index(etiqueta_actual)
+                    else:
+                        st.session_state[key_idx] = len(semanas_disponibles) - 1
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(f"### 📋 Detalle y Novedades del Periodo - {oc_actual} ({estado_oc})")
-        
-        # Filtrar datos de la semana activa en el carrusel
-        df_semana = df_oc[df_oc['semana_label'] == semana_seleccionada]
-        fechas_semana = sorted(df_semana["fecha"].astype(str).unique(), reverse=True)
-        
-        if fechas_semana:
-            for f in fechas_semana:
-                df_todos_dia = df_semana[df_semana["fecha"].astype(str) == f]
-                piezas_dia = df_todos_dia["piezas_producidas"].sum()
+                if st.session_state[key_idx] >= len(semanas_disponibles):
+                    st.session_state[key_idx] = len(semanas_disponibles) - 1
+                if st.session_state[key_idx] < 0:
+                    st.session_state[key_idx] = 0
+
+                st.markdown("### Selector de Semana")
                 
-                df_obs_dia = df_todos_dia[
-                    df_todos_dia["observaciones_turno"].notnull() & 
-                    (~df_todos_dia["observaciones_turno"].str.strip().str.lower().isin(["sin observaciones", "sin observacion", ""]))
-                ]
+                c_btn1, c_lbl, c_btn2 = st.columns([1, 4, 1])
                 
-                if not df_obs_dia.empty:
-                    notas_resumidas = " | ".join(df_obs_dia["observaciones_turno"].tolist())
+                with c_btn1:
+                    if st.button("◀ Anterior", key=f"ant_{oc_actual}", use_container_width=True):
+                        if st.session_state[key_idx] > 0:
+                            st.session_state[key_idx] -= 1
+                            st.rerun()
+                            
+                with c_lbl:
+                    semana_seleccionada = semanas_disponibles[st.session_state[key_idx]]
+                    st.markdown(f"""
+                    <div style="background-color: #1A263D; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #334155;">
+                        <span style="color: #38bdf8; font-weight: bold; font-size: 16px;">📅 {semana_seleccionada}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                with c_btn2:
+                    if st.button("Siguiente ▶", key=f"sig_{oc_actual}", use_container_width=True):
+                        if st.session_state[key_idx] < len(semanas_disponibles) - 1:
+                            st.session_state[key_idx] += 1
+                            st.rerun()
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown(f"### 📋 Detalle y Novedades del Periodo - {oc_actual} ({estado_oc})")
+                
+                # Filtrar datos de la semana activa en el carrusel
+                df_semana = df_oc[df_oc['semana_label'] == semana_seleccionada]
+                fechas_semana = sorted(df_semana["fecha"].astype(str).unique(), reverse=True)
+                
+                if fechas_semana:
+                    for f in fechas_semana:
+                        df_todos_dia = df_semana[df_semana["fecha"].astype(str) == f]
+                        piezas_dia = df_todos_dia["piezas_producidas"].sum()
+                        
+                        df_obs_dia = df_todos_dia[
+                            df_todos_dia["observaciones_turno"].notnull() & 
+                            (~df_todos_dia["observaciones_turno"].str.strip().str.lower().isin(["sin observaciones", "sin observacion", ""]))
+                        ]
+                        
+                        if not df_obs_dia.empty:
+                            notas_resumidas = " | ".join(df_obs_dia["observaciones_turno"].tolist())
+                        else:
+                            notas_resumidas = "Operación normal (Sin incidencias reportadas)"
+                        
+                        st.markdown(f"""
+                        <div style="background-color: #111B2E; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 12px;">
+                            <div style="font-size: 16px; font-weight: bold; color: #F8FAFC; margin-bottom: 4px;">📅 Fecha: {f}</div>
+                            <div style="color: #94A3B8; font-size: 14px; margin-bottom: 4px;">📦 Producción total del día: <b style="color: #F8FAFC;">{piezas_dia} pzas</b></div>
+                            <div style="color: #E2E8F0; font-size: 14px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                 else:
-                    notas_resumidas = "Operación normal (Sin incidencias reportadas)"
-                
-                st.markdown(f"""
-                <div style="background-color: #111B2E; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 12px;">
-                    <div style="font-size: 16px; font-weight: bold; color: #F8FAFC; margin-bottom: 4px;">📅 Fecha: {f}</div>
-                    <div style="color: #94A3B8; font-size: 14px; margin-bottom: 4px;">📦 Producción total del día: <b style="color: #F8FAFC;">{piezas_dia} pzas</b></div>
-                    <div style="color: #E2E8F0; font-size: 14px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                    st.info("No hay registros en esta semana.")
+            else:
+                st.success("🎉 No hay registros de producción para esta orden.")
         else:
-            st.info("No hay registros en esta semana.")
-    else:
-        st.success("🎉 No hay registros de producción para esta orden.")
-else:
-    st.info("Aún no hay registros en la base de datos.")
+            st.info("Aún no hay registros en la base de datos.")
