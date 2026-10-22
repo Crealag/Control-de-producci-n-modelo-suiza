@@ -23,14 +23,35 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS
+# --- ESTILOS CSS EJECUTIVOS ---
 css_estilos = """
 <style>
-.stApp { background-color: #0A0F1D; color: #F8FAFC; }
-div[data-baseweb="select"] { background-color: #1A263D !important; color: #F8FAFC !important; border-color: #334155 !important; }
-.brand-title { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; color: #F8FAFC; }
-[data-testid="stMetricValue"] { color: #F8FAFC !important; font-weight: 800 !important; }
-[data-testid="stMetricLabel"] { color: #94A3B8 !important; font-weight: 700 !important; }
+.stApp { background-color: #080C14; color: #F8FAFC; font-family: 'Inter', sans-serif; }
+div[data-baseweb="select"] { background-color: #111827 !important; color: #F8FAFC !important; border-color: #1F2937 !important; border-radius: 8px; }
+.brand-title { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; color: #F8FAFC; letter-spacing: -0.5px; }
+[data-testid="stMetricValue"] { color: #F8FAFC !important; font-weight: 800 !important; font-size: 1.8rem !important; }
+[data-testid="stMetricLabel"] { color: #94A3B8 !important; font-weight: 600 !important; font-size: 0.85rem !important; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Tarjetas ejecutivas */
+.exec-card {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    padding: 24px;
+    border-radius: 12px;
+    border: 1px solid #1E293B;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    margin-bottom: 20px;
+}
+.welcome-banner {
+    background: linear-gradient(135deg, #111827 0%, #0F172A 100%);
+    padding: 30px;
+    border-radius: 12px;
+    border-left: 5px solid #38BDF8;
+    border-top: 1px solid #1F2937;
+    border-right: 1px solid #1F2937;
+    border-bottom: 1px solid #1F2937;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
 </style>
 """
 st.markdown(css_estilos, unsafe_allow_html=True)
@@ -56,31 +77,33 @@ def cargar_catalogo_ocs():
         pass
     return pd.DataFrame([{"orden_compra": "HC-0505", "meta_piezas": 1700, "estado": "Activa", "piezas_entregadas": 0}])
 
-# --- PANTALLA PRINCIPAL ---
-st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Portal Gerencial Ejecutivo</span></h1>", unsafe_allow_html=True)
-st.markdown("---")
+# --- ENCABEZADO ---
+st.markdown("<h1 class='brand-title' style='font-size: 2rem;'>crealag <span style='font-weight: 300; font-size: 20px; color: #94A3B8;'>| Portal Gerencial Ejecutivo</span></h1>", unsafe_allow_html=True)
+st.markdown("<hr style='border-color: #1E293B; margin-top: 10px; margin-bottom: 25px;'>", unsafe_allow_html=True)
 
-# Bienvenida inicial
-st.markdown("### ¡Bienvenido al Portal Gerencial de Crealag!")
-st.write("Espacio exclusivo para la supervisión y control ejecutivo de la producción, estatus en almacén y bitácoras de piso.")
-st.markdown("<br>", unsafe_allow_html=True)
+# --- BANNER DE BIENVENIDA ---
+st.markdown("""
+<div class="welcome-banner">
+    <h2 style="color: #F8FAFC; margin: 0 0 8px 0; font-size: 1.5rem;">¡Bienvenido al Portal Gerencial de Crealag!</h2>
+    <p style="color: #94A3B8; margin: 0; font-size: 0.95rem; line-height: 1.5;">Espacio exclusivo para la supervisión y control ejecutivo de la producción, estatus de inventario en almacén y bitácoras operativas de piso.</p>
+</div>
+""", unsafe_allow_html=True)
 
 df = cargar_datos_supabase()
 df_ocs_catalogo = cargar_catalogo_ocs()
 
 lista_ocs = df_ocs_catalogo["orden_compra"].tolist() if not df_ocs_catalogo.empty else ["HC-0505"]
 
-# Selector con opción inicial vacua para que no despliegue información por defecto
+# --- SELECTOR PRINCIPAL ---
 opciones_selector = ["-- Selecciona una Orden de Compra --"] + lista_ocs
 seleccion = st.selectbox("Selecciona la orden de compra a consultar", opciones_selector)
 
-st.markdown("---")
+st.markdown("<div style='margin-bottom: 30px;'></div>", unsafe_allow_html=True)
 
-# Validar si el usuario ya seleccionó una orden real
+# --- DESGLOSE AL SELECCIONAR ---
 if seleccion != "-- Selecciona una Orden de Compra --":
     oc_actual = seleccion
 
-    # Obtener datos de la OC seleccionada
     try:
         row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc[0]
         meta_actual = int(row_oc_info.get("meta_piezas", 1700))
@@ -98,24 +121,33 @@ if seleccion != "-- Selecciona una Orden de Compra --":
         piezas_almacen_actual = max(0, total_piezas_oc - entregadas_actual)
         porcentaje = min(1.0, total_piezas_oc / meta_actual) if meta_actual > 0 else 0.0
         
-        # --- MÉTRICAS Y BARRA DE PROGRESO ---
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Meta Estimada OC", f"{meta_actual} pzas")
-        m2.metric("Producido Total", f"{total_piezas_oc} pzas")
-        m3.metric("Entregadas / Remitidas", f"{entregadas_actual} pzas")
-        m4.metric("Disponibles en Almacén", f"{piezas_almacen_actual} pzas")
+        # --- TARJETA CONTENEDORA DE MÉTRICAS ---
+        st.markdown(f"""
+        <div class="exec-card">
+            <div style="font-size: 1.1rem; font-weight: 700; color: #38BDF8; margin-bottom: 15px;">
+                📊 Estatus General — Orden de Compra: {oc_actual} <span style="font-size: 0.8rem; background-color: #0369A1; color: #E0F2FE; padding: 3px 8px; border-radius: 4px; float: right;">{estado_oc}</span>
+            </div>
+        """, unsafe_allow_html=True)
         
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Meta Estimada OC", f"{meta_actual:,} pzas")
+        m2.metric("Producido Total", f"{total_piezas_oc:,} pzas")
+        m3.metric("Entregadas / Remitidas", f"{entregadas_actual:,} pzas")
+        m4.metric("Disponibles en Almacén", f"{piezas_almacen_actual:,} pzas")
+        
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
         st.progress(porcentaje)
-        st.markdown("---")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
         
         if not df_oc.empty:
             df_oc['fecha_dt'] = pd.to_datetime(df_oc['fecha'])
             
-            # Calcular el inicio (Lunes) y fin (Domingo) de cada semana
+            # Calcular rangos de semana
             df_oc['inicio_semana'] = df_oc['fecha_dt'] - pd.to_timedelta(df_oc['fecha_dt'].dt.dayofweek, unit='d')
             df_oc['fin_semana'] = df_oc['inicio_semana'] + pd.to_timedelta(6, unit='d')
             
-            # Etiqueta de rango de fechas
             df_oc['semana_label'] = (
                 "Del " + df_oc['inicio_semana'].dt.strftime('%d/%m/%Y') + 
                 " al " + df_oc['fin_semana'].dt.strftime('%d/%m/%Y')
@@ -124,13 +156,11 @@ if seleccion != "-- Selecciona una Orden de Compra --":
             df_semanas_ordenadas = df_oc[['semana_label', 'inicio_semana']].drop_duplicates().sort_values('inicio_semana')
             semanas_disponibles = df_semanas_ordenadas['semana_label'].tolist()
             
-            # Detectar la semana actual
             hoy = pd.Timestamp(date.today())
             inicio_hoy = hoy - pd.to_timedelta(hoy.dayofweek, unit='d')
             fin_hoy = inicio_hoy + pd.to_timedelta(6, unit='d')
             etiqueta_actual = f"Del {inicio_hoy.strftime('%d/%m/%Y')} al {fin_hoy.strftime('%d/%m/%Y')}"
             
-            # Manejar índice del carrusel por cada orden en st.session_state
             key_idx = f"semana_idx_{oc_actual}"
             
             if key_idx not in st.session_state:
@@ -144,7 +174,8 @@ if seleccion != "-- Selecciona una Orden de Compra --":
             if st.session_state[key_idx] < 0:
                 st.session_state[key_idx] = 0
 
-            st.markdown("### Selector de Semana")
+            # --- CARRUSEL DE SEMANAS ---
+            st.markdown("<h4 style='color: #F8FAFC; font-weight: 600; font-size: 1.1rem;'>📅 Periodo de Análisis Semanal</h4>", unsafe_allow_html=True)
             
             c_btn1, c_lbl, c_btn2 = st.columns([1, 4, 1])
             
@@ -157,8 +188,8 @@ if seleccion != "-- Selecciona una Orden de Compra --":
             with c_lbl:
                 semana_seleccionada = semanas_disponibles[st.session_state[key_idx]]
                 st.markdown(f"""
-                <div style="background-color: #1A263D; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #334155;">
-                    <span style="color: #38bdf8; font-weight: bold; font-size: 16px;">{semana_seleccionada}</span>
+                <div style="background-color: #111827; padding: 11px; border-radius: 8px; text-align: center; border: 1px solid #1F2937; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+                    <span style="color: #38BDF8; font-weight: 700; font-size: 15px;">{semana_seleccionada}</span>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -169,9 +200,8 @@ if seleccion != "-- Selecciona una Orden de Compra --":
                         st.rerun()
 
             st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown(f"### 📋 Detalle y Novedades del Periodo - {oc_actual} ({estado_oc})")
+            st.markdown(f"<h4 style='color: #F8FAFC; font-weight: 600; font-size: 1.1rem;'>📋 Bitácora y Novedades del Periodo</h4>", unsafe_allow_html=True)
             
-            # Filtrar datos de la semana activa en el carrusel
             df_semana = df_oc[df_oc['semana_label'] == semana_seleccionada]
             fechas_semana = sorted(df_semana["fecha"].astype(str).unique(), reverse=True)
             
@@ -191,10 +221,10 @@ if seleccion != "-- Selecciona una Orden de Compra --":
                         notas_resumidas = "Operación normal (Sin incidencias reportadas)"
                     
                     st.markdown(f"""
-                    <div style="background-color: #111B2E; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 12px;">
-                        <div style="font-size: 16px; font-weight: bold; color: #F8FAFC; margin-bottom: 4px;">📅 Fecha: {f}</div>
-                        <div style="color: #94A3B8; font-size: 14px; margin-bottom: 4px;">📦 Producción total del día: <b style="color: #F8FAFC;">{piezas_dia} pzas</b></div>
-                        <div style="color: #E2E8F0; font-size: 14px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
+                    <div style="background-color: #0F172A; padding: 16px; border-radius: 8px; border-left: 4px solid #38BDF8; border-top: 1px solid #1E293B; border-right: 1px solid #1E293B; border-bottom: 1px solid #1E293B; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                        <div style="font-size: 15px; font-weight: bold; color: #F8FAFC; margin-bottom: 4px;">📅 Fecha: {f}</div>
+                        <div style="color: #94A3B8; font-size: 13.5px; margin-bottom: 6px;">📦 Producción total del día: <b style="color: #F8FAFC;">{piezas_dia:,} pzas</b></div>
+                        <div style="color: #E2E8F0; font-size: 13.5px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
                     </div>
                     """, unsafe_allow_html=True)
             else:
@@ -204,4 +234,10 @@ if seleccion != "-- Selecciona una Orden de Compra --":
     else:
         st.info("Aún no hay registros en la base de datos.")
 else:
-    st.info("👆 Por favor, selecciona una Orden de Compra en el menú desplegable superior para consultar su información.")
+    # Estado inicial limpio y profesional antes de elegir orden
+    st.markdown("""
+    <div style="text-align: center; padding: 50px 20px; background-color: #0F172A; border-radius: 12px; border: 1px dashed #1E293B; margin-top: 20px;">
+        <h3 style="color: #94A3B8; font-weight: 500; margin-bottom: 10px;">🔍 Ninguna Orden Seleccionada</h3>
+        <p style="color: #64748B; font-size: 0.95rem;">Por favor, despliega el menú superior y elige una Orden de Compra para consultar su avance gerencial y bitácora.</p>
+    </div>
+    """, unsafe_allow_html=True)
