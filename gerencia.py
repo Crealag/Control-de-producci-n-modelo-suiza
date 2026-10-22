@@ -133,7 +133,7 @@ if not df.empty and "orden_compra" in df.columns:
         if st.session_state.semana_idx < 0:
             st.session_state.semana_idx = 0
 
-        st.markdown("### 🗓️ Selector de Semana (Carrusel)")
+        st.markdown("### Selector de Semana")
         
         c_btn1, c_lbl, c_btn2 = st.columns([1, 4, 1])
         
@@ -179,7 +179,6 @@ if not df.empty and "orden_compra" in df.columns:
                 else:
                     notas_resumidas = "Operación normal (Sin incidencias reportadas)"
                 
-                # Regresamos al formato limpio de tarjetas gerenciales por día
                 st.markdown(f"""
                 <div style="background-color: #111B2E; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 12px;">
                     <div style="font-size: 16px; font-weight: bold; color: #F8FAFC; margin-bottom: 4px;">📅 Fecha: {f}</div>
