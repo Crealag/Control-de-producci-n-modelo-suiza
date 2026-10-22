@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime, date
 from supabase import create_client
 
 # Configuración de la página para Gerencia
@@ -43,7 +44,6 @@ def cargar_datos_supabase():
         res = supabase.table("Producción").select("*").execute()
         return pd.DataFrame(res.data) if res.data else pd.DataFrame(columns=["id", "orden_compra", "fecha", "hora", "piezas_producidas", "observaciones_turno"])
     except Exception as e:
-        st.warning(f"No se pudo cargar la tabla 'Producción': {e}")
         return pd.DataFrame(columns=["id", "orden_compra", "fecha", "hora", "piezas_producidas", "observaciones_turno"])
 
 def cargar_catalogo_ocs():
@@ -54,21 +54,17 @@ def cargar_catalogo_ocs():
         if res.data:
             return pd.DataFrame(res.data)
     except Exception as e:
-        st.warning(f"No se pudo cargar la tabla 'Órdenes_Compra': {e}")
+        pass
     return pd.DataFrame([{"orden_compra": "HC-0505", "meta_piezas": 1700, "estado": "Activa", "piezas_entregadas": 0}])
 
 # --- VISTA GERENCIAL ---
-st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Resumen Gerencial Diario</span></h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Resumen Gerencial por Semanas</span></h1>", unsafe_allow_html=True)
 st.markdown("---")
 
 df = cargar_datos_supabase()
 df_ocs_catalogo = cargar_catalogo_ocs()
 
-if not df_ocs_catalogo.empty and "orden_compra" in df_ocs_catalogo.columns:
-    lista_ocs = df_ocs_catalogo["orden_compra"].tolist()
-else:
-    lista_ocs = ["HC-0505"]
-
+lista_ocs = df_ocs_catalogo["orden_compra"].tolist() if not df_ocs_catalogo.empty else ["HC-0505"]
 oc_actual = st.selectbox("Seleccionar Orden de Compra:", lista_ocs)
 
 # Obtener datos de la OC seleccionada
@@ -85,13 +81,13 @@ except Exception:
 st.markdown("---")
 
 if not df.empty and "orden_compra" in df.columns:
-    df_oc = df[df["orden_compra"] == oc_actual]
+    df_oc = df[df["orden_compra"] == oc_actual].copy()
     
     total_piezas_oc = df_oc["piezas_producidas"].sum() if not df_oc.empty else 0
     piezas_almacen_actual = max(0, total_piezas_oc - entregadas_actual)
     porcentaje = min(1.0, total_piezas_oc / meta_actual) if meta_actual > 0 else 0.0
     
-    # --- MÉTRICAS EXACTAS Y BARRA DE PROGRESO ---
+    # --- MÉTRICAS Y BARRA DE PROGRESO ---
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Meta Estimada OC", f"{meta_actual} pzas")
     m2.metric("Producido Total", f"{total_piezas_oc} pzas")
@@ -101,13 +97,41 @@ if not df.empty and "orden_compra" in df.columns:
     st.progress(porcentaje)
     st.markdown("---")
     
-    st.subheader(f"📅 Bitácora Resumida Diaria - {oc_actual} ({estado_oc})")
-    
-    fechas_todas = sorted(df_oc["fecha"].astype(str).unique(), reverse=True)
-    
-    if fechas_todas:
-        for f in fechas_todas:
-            df_todos_dia = df_oc[df_oc["fecha"].astype(str) == f]
+    if not df_oc.empty:
+        # Convertir fecha a datetime para calcular la semana del año de forma precisa
+        df_oc['fecha_dt'] = pd.to_datetime(df_oc['fecha'])
+        df_oc['semana_anio'] = df_oc['fecha_dt'].dt.isocalendar().week
+        df_oc['anio'] = df_oc['fecha_dt'].dt.year
+        
+        # Crear etiqueta legible para la semana (Ej. "Semana 43 (2026)")
+        df_oc['semana_label'] = "Semana " + df_oc['semana_anio'].astype(str) + " (" + df_oc['anio'].astype(str) + ")"
+        
+        # Calcular cuál es la semana actual del sistema para seleccionarla por defecto
+        semana_actual_num = datetime.now().isocalendar()[1]
+        anio_actual_num = datetime.now().year
+        etiqueta_semana_actual = f"Semana {semana_actual_num} ({anio_actual_num})"
+        
+        # Lista de semanas disponibles ordenadas de más reciente a más antigua
+        semanas_disponibles = sorted(df_oc['semana_label'].unique(), reverse=True)
+        
+        # Determinar el índice por defecto (si la semana actual está en la lista, la selecciona; si no, agarra la primera)
+        default_idx = 0
+        if etiqueta_semana_actual in semanas_disponibles:
+            default_idx = semanas_disponibles.index(etiqueta_semana_actual)
+            
+        st.subheader("📅 Filtrar Bitácora por Semana")
+        semana_seleccionada = st.selectbox("Selecciona la semana a revisar:", semanas_disponibles, index=default_idx)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"### 📋 Resumen de la {semana_seleccionada} - {oc_actual} ({estado_oc})")
+        
+        # Filtrar los datos únicamente de la semana seleccionada
+        df_semana = df_oc[df_oc['semana_label'] == semana_seleccionada]
+        fechas_semana = sorted(df_semana["fecha"].astype(str).unique(), reverse=True)
+        
+        datos_tabla = []
+        for f in fechas_semana:
+            df_todos_dia = df_semana[df_semana["fecha"].astype(str) == f]
             piezas_dia = df_todos_dia["piezas_producidas"].sum()
             
             df_obs_dia = df_todos_dia[
@@ -118,15 +142,26 @@ if not df.empty and "orden_compra" in df.columns:
             if not df_obs_dia.empty:
                 notas_resumidas = " | ".join(df_obs_dia["observaciones_turno"].tolist())
             else:
-                notas_resumidas = "Operación normal (Sin incidencias reportadas)"
+                notas_resumidas = "Operación normal (Sin incidencias)"
             
-            st.markdown(f"""
-            <div style="background-color: #111B2E; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 12px;">
-                <div style="font-size: 16px; font-weight: bold; color: #F8FAFC; margin-bottom: 4px;">📅 Fecha: {f}</div>
-                <div style="color: #94A3B8; font-size: 14px; margin-bottom: 4px;">📦 Producción total del día: <b style="color: #F8FAFC;">{piezas_dia} pzas</b></div>
-                <div style="color: #E2E8F0; font-size: 14px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            datos_tabla.append({
+                "Fecha": f,
+                "Producción Diaria": f"{piezas_dia} pzas",
+                "Novedades / Motivo": notas_resumidas
+            })
+        
+        df_resumen_gerencia = pd.DataFrame(datos_tabla)
+        
+        st.dataframe(
+            df_resumen_gerencia, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "Fecha": st.column_config.TextColumn("📅 Fecha", width="medium"),
+                "Producción Diaria": st.column_config.TextColumn("📦 Producción del Día", width="medium"),
+                "Novedades / Motivo": st.column_config.TextColumn("📝 Novedades / Motivos de Desviación", width="large"),
+            }
+        )
     else:
         st.success("🎉 No hay registros de producción para esta orden.")
 else:
