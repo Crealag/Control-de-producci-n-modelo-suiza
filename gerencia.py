@@ -126,9 +126,8 @@ if not df.empty and "orden_compra" in df.columns:
             if etiqueta_actual in semanas_disponibles:
                 st.session_state.semana_idx = semanas_disponibles.index(etiqueta_actual)
             else:
-                st.session_state.semana_idx = len(semanas_disponibles) - 1 # Última semana disponible
+                st.session_state.semana_idx = len(semanas_disponibles) - 1
 
-        # Asegurar límites de índice válidos
         if st.session_state.semana_idx >= len(semanas_disponibles):
             st.session_state.semana_idx = len(semanas_disponibles) - 1
         if st.session_state.semana_idx < 0:
@@ -136,7 +135,6 @@ if not df.empty and "orden_compra" in df.columns:
 
         st.markdown("### 🗓️ Selector de Semana (Carrusel)")
         
-        # Diseño del Carrusel con Botones de Navegación Lateral [ < ] [ Semana ] [ > ]
         c_btn1, c_lbl, c_btn2 = st.columns([1, 4, 1])
         
         with c_btn1:
@@ -166,39 +164,31 @@ if not df.empty and "orden_compra" in df.columns:
         df_semana = df_oc[df_oc['semana_label'] == semana_seleccionada]
         fechas_semana = sorted(df_semana["fecha"].astype(str).unique(), reverse=True)
         
-        datos_tabla = []
-        for f in fechas_semana:
-            df_todos_dia = df_semana[df_semana["fecha"].astype(str) == f]
-            piezas_dia = df_todos_dia["piezas_producidas"].sum()
-            
-            df_obs_dia = df_todos_dia[
-                df_todos_dia["observaciones_turno"].notnull() & 
-                (~df_todos_dia["observaciones_turno"].str.strip().str.lower().isin(["sin observaciones", "sin observacion", ""]))
-            ]
-            
-            if not df_obs_dia.empty:
-                notas_resumidas = " | ".join(df_obs_dia["observaciones_turno"].tolist())
-            else:
-                notas_resumidas = "Operación normal (Sin incidencias)"
-            
-            datos_tabla.append({
-                "Fecha": f,
-                "Producción Diaria": f"{piezas_dia} pzas",
-                "Novedades / Motivo": notas_resumidas
-            })
-        
-        df_resumen_gerencia = pd.DataFrame(datos_tabla)
-        
-        st.dataframe(
-            df_resumen_gerencia, 
-            use_container_width=True, 
-            hide_index=True,
-            column_config={
-                "Fecha": st.column_config.TextColumn("📅 Fecha", width="medium"),
-                "Producción Diaria": st.column_config.TextColumn("📦 Producción del Día", width="medium"),
-                "Novedades / Motivo": st.column_config.TextColumn("📝 Novedades / Motivos de Desviación", width="large"),
-            }
-        )
+        if fechas_semana:
+            for f in fechas_semana:
+                df_todos_dia = df_semana[df_semana["fecha"].astype(str) == f]
+                piezas_dia = df_todos_dia["piezas_producidas"].sum()
+                
+                df_obs_dia = df_todos_dia[
+                    df_todos_dia["observaciones_turno"].notnull() & 
+                    (~df_todos_dia["observaciones_turno"].str.strip().str.lower().isin(["sin observaciones", "sin observacion", ""]))
+                ]
+                
+                if not df_obs_dia.empty:
+                    notas_resumidas = " | ".join(df_obs_dia["observaciones_turno"].tolist())
+                else:
+                    notas_resumidas = "Operación normal (Sin incidencias reportadas)"
+                
+                # Regresamos al formato limpio de tarjetas gerenciales por día
+                st.markdown(f"""
+                <div style="background-color: #111B2E; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 12px;">
+                    <div style="font-size: 16px; font-weight: bold; color: #F8FAFC; margin-bottom: 4px;">📅 Fecha: {f}</div>
+                    <div style="color: #94A3B8; font-size: 14px; margin-bottom: 4px;">📦 Producción total del día: <b style="color: #F8FAFC;">{piezas_dia} pzas</b></div>
+                    <div style="color: #E2E8F0; font-size: 14px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No hay registros en esta semana.")
     else:
         st.success("🎉 No hay registros de producción para esta orden.")
 else:
