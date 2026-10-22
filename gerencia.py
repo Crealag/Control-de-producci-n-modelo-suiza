@@ -17,7 +17,8 @@ SUPABASE_KEY = "sb_publishable_D79R2pyWt6LI3lggygrbjg_4oJmoEX_"
 def init_supabase():
     try:
         return create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception:
+    except Exception as e:
+        st.error(f"Error de conexión con Supabase: {e}")
         return None
 
 supabase = init_supabase()
@@ -41,60 +42,74 @@ def cargar_datos_supabase():
     try:
         res = supabase.table("Producción").select("*").execute()
         return pd.DataFrame(res.data) if res.data else pd.DataFrame(columns=["id", "orden_compra", "fecha", "hora", "piezas_producidas", "observaciones_turno"])
-    except Exception:
+    except Exception as e:
+        st.warning(f"No se pudo cargar la tabla 'Producción': {e}")
         return pd.DataFrame(columns=["id", "orden_compra", "fecha", "hora", "piezas_producidas", "observaciones_turno"])
 
 def cargar_catalogo_ocs():
     if not supabase:
-        return ["HC-0505"]
+        return pd.DataFrame([{"orden_compra": "HC-0505", "meta_piezas": 1700, "estado": "Activa", "piezas_entregadas": 0}])
     try:
-        res = supabase.table("Órdenes_Compra").select("orden_compra").execute()
+        res = supabase.table("Órdenes_Compra").select("*").execute()
         if res.data:
-            return [row["orden_compra"] for row in res.data]
-    except Exception:
-        pass
-    return ["HC-0505"]
+            return pd.DataFrame(res.data)
+    except Exception as e:
+        st.warning(f"No se pudo cargar la tabla 'Órdenes_Compra': {e}")
+    return pd.DataFrame([{"orden_compra": "HC-0505", "meta_piezas": 1700, "estado": "Activa", "piezas_entregadas": 0}])
 
 # --- VISTA GERENCIAL ---
 st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Resumen Gerencial Diario</span></h1>", unsafe_allow_html=True)
 st.markdown("---")
 
 df = cargar_datos_supabase()
-lista_ocs = cargar_catalogo_ocs()
+df_ocs_catalogo = cargar_catalogo_ocs()
+
+if not df_ocs_catalogo.empty and "orden_compra" in df_ocs_catalogo.columns:
+    lista_ocs = df_ocs_catalogo["orden_compra"].tolist()
+else:
+    lista_ocs = ["HC-0505"]
 
 oc_actual = st.selectbox("Seleccionar Orden de Compra:", lista_ocs)
+
+# Obtener datos de la OC seleccionada
+try:
+    row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc[0]
+    meta_actual = int(row_oc_info.get("meta_piezas", 1700))
+    estado_oc = str(row_oc_info.get("estado", "Activa"))
+    entregadas_actual = int(row_oc_info.get("piezas_entregadas", 0) if pd.notnull(row_oc_info.get("piezas_entregadas")) else 0)
+except Exception:
+    meta_actual = 1700
+    estado_oc = "Activa"
+    entregadas_actual = 0
+
 st.markdown("---")
 
-if not df.empty:
+if not df.empty and "orden_compra" in df.columns:
     df_oc = df[df["orden_compra"] == oc_actual]
     
-    # Identificar registros con observaciones reales (para el contador de incidencias)
-    df_obs = df_oc[
-        df_oc["observaciones_turno"].notnull() & 
-        (~df_oc["observaciones_turno"].str.strip().str.lower().isin(["sin observaciones", "sin observacion", ""]))
-    ].copy()
-    
-    total_incidencias = len(df_obs)
     total_piezas_oc = df_oc["piezas_producidas"].sum() if not df_oc.empty else 0
+    piezas_almacen_actual = max(0, total_piezas_oc - entregadas_actual)
+    porcentaje = min(1.0, total_piezas_oc / meta_actual) if meta_actual > 0 else 0.0
     
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Orden Activa", oc_actual)
-    col2.metric("Total Producido", f"{total_piezas_oc} pzas")
-    col3.metric("Reportes / Incidencias", f"{total_incidencias}")
+    # --- MÉTRICAS EXACTAS Y BARRA DE PROGRESO ---
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Meta Estimada OC", f"{meta_actual} pzas")
+    m2.metric("Producido Total", f"{total_piezas_oc} pzas")
+    m3.metric("Entregadas / Remitidas", f"{entregadas_actual} pzas")
+    m4.metric("Disponibles en Almacén", f"{piezas_almacen_actual} pzas")
     
+    st.progress(porcentaje)
     st.markdown("---")
-    st.subheader(f"📅 Bitácora Resumida Diaria - {oc_actual}")
     
-    # Obtener TODAS las fechas registradas en la orden (ordenadas de la más reciente a la más antigua)
+    st.subheader(f"📅 Bitácora Resumida Diaria - {oc_actual} ({estado_oc})")
+    
     fechas_todas = sorted(df_oc["fecha"].astype(str).unique(), reverse=True)
     
     if fechas_todas:
         for f in fechas_todas:
-            # Todos los registros de esta fecha para sumar la producción total del día
             df_todos_dia = df_oc[df_oc["fecha"].astype(str) == f]
             piezas_dia = df_todos_dia["piezas_producidas"].sum()
             
-            # Filtrar solo las observaciones reales de ese día (excluyendo "Sin observaciones")
             df_obs_dia = df_todos_dia[
                 df_todos_dia["observaciones_turno"].notnull() & 
                 (~df_todos_dia["observaciones_turno"].str.strip().str.lower().isin(["sin observaciones", "sin observacion", ""]))
