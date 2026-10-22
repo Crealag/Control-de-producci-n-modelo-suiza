@@ -192,4 +192,87 @@ if not df.empty and "orden_compra" in df.columns:
         df_oc['fin_semana'] = df_oc['inicio_semana'] + pd.to_timedelta(6, unit='d')
         
         df_oc['semana_label'] = (
-            "Del " + df_
+            "Del " + df_oc['inicio_semana'].dt.strftime('%d/%m/%Y') + 
+            " al " + df_oc['fin_semana'].dt.strftime('%d/%m/%Y')
+        )
+        
+        df_semanas_ordenadas = df_oc[['semana_label', 'inicio_semana']].drop_duplicates().sort_values('inicio_semana')
+        semanas_disponibles = df_semanas_ordenadas['semana_label'].tolist()
+        
+        hoy = pd.Timestamp(date.today())
+        inicio_hoy = hoy - pd.to_timedelta(hoy.dayofweek, unit='d')
+        fin_hoy = inicio_hoy + pd.to_timedelta(6, unit='d')
+        etiqueta_actual = f"Del {inicio_hoy.strftime('%d/%m/%Y')} al {fin_hoy.strftime('%d/%m/%Y')}"
+        
+        key_idx = f"semana_idx_{oc_actual}"
+        
+        if key_idx not in st.session_state:
+            if etiqueta_actual in semanas_disponibles:
+                st.session_state[key_idx] = semanas_disponibles.index(etiqueta_actual)
+            else:
+                st.session_state[key_idx] = len(semanas_disponibles) - 1
+
+        if st.session_state[key_idx] >= len(semanas_disponibles):
+            st.session_state[key_idx] = len(semanas_disponibles) - 1
+        if st.session_state[key_idx] < 0:
+            st.session_state[key_idx] = 0
+
+        # --- CARRUSEL DE SEMANAS ---
+        st.markdown("<h4 style='color: #F8FAFC; font-weight: 600; font-size: 1.15rem; margin-bottom: 15px;'>📅 Periodo de Análisis Semanal</h4>", unsafe_allow_html=True)
+        
+        c_btn1, c_lbl, c_btn2 = st.columns([1, 4, 1])
+        
+        with c_btn1:
+            if st.button("◀ Anterior", key=f"ant_{oc_actual}", use_container_width=True):
+                if st.session_state[key_idx] > 0:
+                    st.session_state[key_idx] -= 1
+                    st.rerun()
+                    
+        with c_lbl:
+            semana_seleccionada = semanas_disponibles[st.session_state[key_idx]]
+            st.markdown(f"""
+            <div style="background-color: #0F172A; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                <span style="color: #38BDF8; font-weight: 700; font-size: 16px;">{semana_seleccionada}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with c_btn2:
+            if st.button("Siguiente ▶", key=f"sig_{oc_actual}", use_container_width=True):
+                if st.session_state[key_idx] < len(semanas_disponibles) - 1:
+                    st.session_state[key_idx] += 1
+                    st.rerun()
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"<h4 style='color: #F8FAFC; font-weight: 600; font-size: 1.15rem; margin-bottom: 15px;'>📋 Bitácora y Novedades del Periodo</h4>", unsafe_allow_html=True)
+        
+        df_semana = df_oc[df_oc['semana_label'] == semana_seleccionada]
+        fechas_semana = sorted(df_semana["fecha"].astype(str).unique(), reverse=True)
+        
+        if fechas_semana:
+            for f in fechas_semana:
+                df_todos_dia = df_semana[df_semana["fecha"].astype(str) == f]
+                piezas_dia = df_todos_dia["piezas_producidas"].sum()
+                
+                df_obs_dia = df_todos_dia[
+                    df_todos_dia["observaciones_turno"].notnull() & 
+                    (~df_todos_dia["observaciones_turno"].str.strip().str.lower().isin(["sin observaciones", "sin observacion", ""]))
+                ]
+                
+                if not df_obs_dia.empty:
+                    notas_resumidas = " | ".join(df_obs_dia["observaciones_turno"].tolist())
+                else:
+                    notas_resumidas = "Operación normal (Sin incidencias reportadas)"
+                
+                st.markdown(f"""
+                <div style="background-color: #0F172A; padding: 18px; border-radius: 12px; border-left: 4px solid #38BDF8; border-top: 1px solid #1E293B; border-right: 1px solid #1E293B; border-bottom: 1px solid #1E293B; margin-bottom: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.35);">
+                    <div style="font-size: 15.5px; font-weight: bold; color: #F8FAFC; margin-bottom: 6px;">📅 Fecha: {f}</div>
+                    <div style="color: #94A3B8; font-size: 14px; margin-bottom: 6px;">📦 Producción total del día: <b style="color: #F8FAFC;">{piezas_dia:,} pzas</b></div>
+                    <div style="color: #E2E8F0; font-size: 14px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No hay registros en esta semana.")
+    else:
+        st.success("🎉 No hay registros de producción para esta orden.")
+else:
+    st.info("Aún no hay registros en la base de datos.")
