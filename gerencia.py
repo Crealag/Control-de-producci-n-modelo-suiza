@@ -23,33 +23,60 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- ESTILOS CSS EJECUTIVOS ---
+# --- ESTILOS CSS DE ALTA GAMA (UI/UX EJECUTIVO) ---
 css_estilos = """
 <style>
-.stApp { background-color: #080C14; color: #F8FAFC; font-family: 'Inter', sans-serif; }
-div[data-baseweb="select"] { background-color: #111827 !important; color: #F8FAFC !important; border-color: #1F2937 !important; border-radius: 8px; }
+.stApp { background-color: #050811; color: #F8FAFC; font-family: 'Inter', sans-serif; }
+div[data-baseweb="select"] { background-color: #0F172A !important; color: #F8FAFC !important; border-color: #334155 !important; border-radius: 10px; }
 .brand-title { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; color: #F8FAFC; letter-spacing: -0.5px; }
+
 [data-testid="stMetricValue"] { color: #F8FAFC !important; font-weight: 800 !important; font-size: 1.8rem !important; }
 [data-testid="stMetricLabel"] { color: #94A3B8 !important; font-weight: 600 !important; font-size: 0.85rem !important; text-transform: uppercase; letter-spacing: 0.5px; }
 
+/* Tarjetas ejecutivas con efecto flotante y brillo sutil */
 .exec-card {
-    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
-    padding: 24px;
-    border-radius: 12px;
-    border: 1px solid #1E293B;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-    margin-bottom: 20px;
-}
-.welcome-banner {
-    background: linear-gradient(135deg, #111827 0%, #0F172A 100%);
-    padding: 30px;
-    border-radius: 12px;
-    border-left: 5px solid #38BDF8;
-    border-top: 1px solid #1F2937;
-    border-right: 1px solid #1F2937;
-    border-bottom: 1px solid #1F2937;
+    background: linear-gradient(145deg, #0F172A 0%, #1E293B 100%);
+    padding: 28px;
+    border-radius: 16px;
+    border: 1px solid rgba(56, 189, 248, 0.15);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     margin-bottom: 25px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+/* Banner de Bienvenida Premium */
+.welcome-hero {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0B132B 100%);
+    padding: 40px;
+    border-radius: 20px;
+    border-left: 6px solid #38BDF8;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    border-right: 1px solid rgba(255,255,255,0.05);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    margin-bottom: 30px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+    position: relative;
+    overflow: hidden;
+}
+
+.welcome-hero::after {
+    content: "";
+    position: absolute;
+    top: -50px;
+    right: -50px;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(56,189,248,0.1) 0%, rgba(0,0,0,0) 70%);
+    border-radius: 50%;
+    z-index: 1;
+}
+
+.selector-container {
+    background: #0B132B;
+    padding: 24px;
+    border-radius: 14px;
+    border: 1px solid #1E293B;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    margin-bottom: 30px;
 }
 </style>
 """
@@ -76,15 +103,20 @@ def cargar_catalogo_ocs():
         pass
     return pd.DataFrame([{"orden_compra": "HC-0505", "meta_piezas": 1700, "estado": "Activa", "piezas_entregadas": 0}])
 
-# --- ENCABEZADO ---
-st.markdown("<h1 class='brand-title' style='font-size: 2rem;'>crealag <span style='font-weight: 300; font-size: 20px; color: #94A3B8;'>| Portal Gerencial Ejecutivo</span></h1>", unsafe_allow_html=True)
-st.markdown("<hr style='border-color: #1E293B; margin-top: 10px; margin-bottom: 25px;'>", unsafe_allow_html=True)
+# --- ENCABEZADO SUPERIOR ---
+st.markdown("<h1 class='brand-title' style='font-size: 2.2rem;'>crealag <span style='font-weight: 300; font-size: 20px; color: #94A3B8;'>| Portal Gerencial Ejecutivo</span></h1>", unsafe_allow_html=True)
+st.markdown("<hr style='border-color: #1E293B; margin-top: 12px; margin-bottom: 30px;'>", unsafe_allow_html=True)
 
-# --- BANNER DE BIENVENIDA ---
+# --- HERO / BANNER DE BIENVENIDA ---
 st.markdown("""
-<div class="welcome-banner">
-    <h2 style="color: #F8FAFC; margin: 0 0 8px 0; font-size: 1.5rem;">¡Bienvenido al Portal Gerencial de Crealag!</h2>
-    <p style="color: #94A3B8; margin: 0; font-size: 0.95rem; line-height: 1.5;">Espacio exclusivo para la supervisión y control ejecutivo de la producción, estatus de inventario en almacén y bitácoras operativas de piso.</p>
+<div class="welcome-hero">
+    <div style="position: relative; z-index: 2;">
+        <span style="background-color: rgba(56, 189, 248, 0.15); color: #38BDF8; padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Panel Directivo</span>
+        <h2 style="color: #F8FAFC; margin: 15px 0 10px 0; font-size: 2rem; font-weight: 700;">¡Bienvenido al Portal Gerencial de Crealag!</h2>
+        <p style="color: #94A3B8; margin: 0; font-size: 1.05rem; line-height: 1.6; max-width: 900px;">
+            Plataforma centralizada para la supervisión en tiempo real del rendimiento de producción, control de inventario en almacén, entregas y trazabilidad de bitácoras operativas de piso.
+        </p>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -93,11 +125,14 @@ df_ocs_catalogo = cargar_catalogo_ocs()
 
 lista_ocs = df_ocs_catalogo["orden_compra"].tolist() if not df_ocs_catalogo.empty else ["HC-0505"]
 
-# --- SELECTOR PRINCIPAL ---
+# --- SELECTOR DE ORDEN EN CONTENEDOR ESTILIZADO ---
+st.markdown("<div class='selector-container'>", unsafe_allow_html=True)
+st.markdown("<p style='color: #38BDF8; font-weight: 600; font-size: 0.95rem; margin-bottom: 8px;'>🎯 SELECCIÓN DE ORDEN DE COMPRA</p>", unsafe_allow_html=True)
 opciones_selector = ["-- Selecciona una Orden de Compra --"] + lista_ocs
-seleccion = st.selectbox("Selecciona la orden de compra a consultar", opciones_selector)
+seleccion = st.selectbox("", opciones_selector, label_visibility="collapsed")
+st.markdown("</div>", unsafe_allow_html=True)
 
-# Si no ha seleccionado ninguna orden, detenemos la ejecución de la página aquí mismo
+# Si no ha seleccionado ninguna orden, detenemos la ejecución aquí (pantalla limpia y elegante)
 if seleccion == "-- Selecciona una Orden de Compra --":
     st.stop()
 
@@ -126,8 +161,9 @@ if not df.empty and "orden_compra" in df.columns:
     # --- TARJETA CONTENEDORA DE MÉTRICAS ---
     st.markdown(f"""
     <div class="exec-card">
-        <div style="font-size: 1.1rem; font-weight: 700; color: #38BDF8; margin-bottom: 15px;">
-            📊 Estatus General — Orden de Compra: {oc_actual} <span style="font-size: 0.8rem; background-color: #0369A1; color: #E0F2FE; padding: 3px 8px; border-radius: 4px; float: right;">{estado_oc}</span>
+        <div style="font-size: 1.2rem; font-weight: 700; color: #38BDF8; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <span>📊 Estatus General — Orden de Compra: {oc_actual}</span>
+            <span style="font-size: 0.85rem; background-color: #0284C7; color: #F0F9FF; padding: 4px 12px; border-radius: 6px; font-weight: 600;">{estado_oc}</span>
         </div>
     """, unsafe_allow_html=True)
     
@@ -137,7 +173,7 @@ if not df.empty and "orden_compra" in df.columns:
     m3.metric("Entregadas / Remitidas", f"{entregadas_actual:,} pzas")
     m4.metric("Disponibles en Almacén", f"{piezas_almacen_actual:,} pzas")
     
-    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
     st.progress(porcentaje)
     st.markdown("</div>", unsafe_allow_html=True)
     
@@ -177,7 +213,7 @@ if not df.empty and "orden_compra" in df.columns:
             st.session_state[key_idx] = 0
 
         # --- CARRUSEL DE SEMANAS ---
-        st.markdown("<h4 style='color: #F8FAFC; font-weight: 600; font-size: 1.1rem;'>📅 Periodo de Análisis Semanal</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #F8FAFC; font-weight: 600; font-size: 1.15rem; margin-bottom: 15px;'>📅 Periodo de Análisis Semanal</h4>", unsafe_allow_html=True)
         
         c_btn1, c_lbl, c_btn2 = st.columns([1, 4, 1])
         
@@ -190,8 +226,8 @@ if not df.empty and "orden_compra" in df.columns:
         with c_lbl:
             semana_seleccionada = semanas_disponibles[st.session_state[key_idx]]
             st.markdown(f"""
-            <div style="background-color: #111827; padding: 11px; border-radius: 8px; text-align: center; border: 1px solid #1F2937; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
-                <span style="color: #38BDF8; font-weight: 700; font-size: 15px;">{semana_seleccionada}</span>
+            <div style="background-color: #0F172A; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                <span style="color: #38BDF8; font-weight: 700; font-size: 16px;">{semana_seleccionada}</span>
             </div>
             """, unsafe_allow_html=True)
             
@@ -202,7 +238,7 @@ if not df.empty and "orden_compra" in df.columns:
                     st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(f"<h4 style='color: #F8FAFC; font-weight: 600; font-size: 1.1rem;'>📋 Bitácora y Novedades del Periodo</h4>", unsafe_allow_html=True)
+        st.markdown(f"<h4 style='color: #F8FAFC; font-weight: 600; font-size: 1.15rem; margin-bottom: 15px;'>📋 Bitácora y Novedades del Periodo</h4>", unsafe_allow_html=True)
         
         df_semana = df_oc[df_oc['semana_label'] == semana_seleccionada]
         fechas_semana = sorted(df_semana["fecha"].astype(str).unique(), reverse=True)
@@ -223,10 +259,10 @@ if not df.empty and "orden_compra" in df.columns:
                     notas_resumidas = "Operación normal (Sin incidencias reportadas)"
                 
                 st.markdown(f"""
-                <div style="background-color: #0F172A; padding: 16px; border-radius: 8px; border-left: 4px solid #38BDF8; border-top: 1px solid #1E293B; border-right: 1px solid #1E293B; border-bottom: 1px solid #1E293B; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
-                    <div style="font-size: 15px; font-weight: bold; color: #F8FAFC; margin-bottom: 4px;">📅 Fecha: {f}</div>
-                    <div style="color: #94A3B8; font-size: 13.5px; margin-bottom: 6px;">📦 Producción total del día: <b style="color: #F8FAFC;">{piezas_dia:,} pzas</b></div>
-                    <div style="color: #E2E8F0; font-size: 13.5px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
+                <div style="background-color: #0F172A; padding: 18px; border-radius: 12px; border-left: 4px solid #38BDF8; border-top: 1px solid #1E293B; border-right: 1px solid #1E293B; border-bottom: 1px solid #1E293B; margin-bottom: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.35);">
+                    <div style="font-size: 15.5px; font-weight: bold; color: #F8FAFC; margin-bottom: 6px;">📅 Fecha: {f}</div>
+                    <div style="color: #94A3B8; font-size: 14px; margin-bottom: 6px;">📦 Producción total del día: <b style="color: #F8FAFC;">{piezas_dia:,} pzas</b></div>
+                    <div style="color: #E2E8F0; font-size: 14px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
                 </div>
                 """, unsafe_allow_html=True)
         else:
