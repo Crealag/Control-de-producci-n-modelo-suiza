@@ -58,7 +58,7 @@ def cargar_catalogo_ocs():
     return pd.DataFrame([{"orden_compra": "HC-0505", "meta_piezas": 1700, "estado": "Activa", "piezas_entregadas": 0}])
 
 # --- VISTA GERENCIAL ---
-st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Resumen Gerencial por Semanas</span></h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Resumen Gerencial por Fechas</span></h1>", unsafe_allow_html=True)
 st.markdown("---")
 
 df = cargar_datos_supabase()
@@ -98,34 +98,36 @@ if not df.empty and "orden_compra" in df.columns:
     st.markdown("---")
     
     if not df_oc.empty:
-        # Convertir fecha a datetime para calcular la semana del año de forma precisa
         df_oc['fecha_dt'] = pd.to_datetime(df_oc['fecha'])
-        df_oc['semana_anio'] = df_oc['fecha_dt'].dt.isocalendar().week
-        df_oc['anio'] = df_oc['fecha_dt'].dt.year
         
-        # Crear etiqueta legible para la semana (Ej. "Semana 43 (2026)")
-        df_oc['semana_label'] = "Semana " + df_oc['semana_anio'].astype(str) + " (" + df_oc['anio'].astype(str) + ")"
+        # Calcular el inicio (Lunes) y fin (Domingo) de cada semana automáticamente
+        df_oc['inicio_semana'] = df_oc['fecha_dt'] - pd.to_timedelta(df_oc['fecha_dt'].dt.dayofweek, unit='d')
+        df_oc['fin_semana'] = df_oc['inicio_semana'] + pd.to_timedelta(6, unit='d')
         
-        # Calcular cuál es la semana actual del sistema para seleccionarla por defecto
-        semana_actual_num = datetime.now().isocalendar()[1]
-        anio_actual_num = datetime.now().year
-        etiqueta_semana_actual = f"Semana {semana_actual_num} ({anio_actual_num})"
+        # Crear etiqueta con rangos de fechas claros (Ej: "Del 19/10/2026 al 25/10/2026")
+        df_oc['semana_label'] = (
+            "Del " + df_oc['inicio_semana'].dt.strftime('%d/%m/%Y') + 
+            " al " + df_oc['fin_semana'].dt.strftime('%d/%m/%Y')
+        )
         
-        # Lista de semanas disponibles ordenadas de más reciente a más antigua
+        # Detectar la semana actual para seleccionarla por defecto
+        hoy = pd.Timestamp(date.today())
+        inicio_hoy = hoy - pd.to_timedelta(hoy.dayofweek, unit='d')
+        fin_hoy = inicio_hoy + pd.to_timedelta(6, unit='d')
+        etiqueta_actual = f"Del {inicio_hoy.strftime('%d/%m/%Y')} al {fin_hoy.strftime('%d/%m/%Y')}"
+        
         semanas_disponibles = sorted(df_oc['semana_label'].unique(), reverse=True)
         
-        # Determinar el índice por defecto (si la semana actual está en la lista, la selecciona; si no, agarra la primera)
         default_idx = 0
-        if etiqueta_semana_actual in semanas_disponibles:
-            default_idx = semanas_disponibles.index(etiqueta_semana_actual)
+        if etiqueta_actual in semanas_disponibles:
+            default_idx = semanas_disponibles.index(etiqueta_actual)
             
-        st.subheader("📅 Filtrar Bitácora por Semana")
-        semana_seleccionada = st.selectbox("Selecciona la semana a revisar:", semanas_disponibles, index=default_idx)
+        st.subheader("📅 Filtrar Bitácora por Rango Semanal")
+        semana_seleccionada = st.selectbox("Selecciona el rango de fechas a revisar:", semanas_disponibles, index=default_idx)
         
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(f"### 📋 Resumen de la {semana_seleccionada} - {oc_actual} ({estado_oc})")
+        st.markdown(f"### 📋 Resumen del Periodo `{semana_seleccionada}` - {oc_actual} ({estado_oc})")
         
-        # Filtrar los datos únicamente de la semana seleccionada
         df_semana = df_oc[df_oc['semana_label'] == semana_seleccionada]
         fechas_semana = sorted(df_semana["fecha"].astype(str).unique(), reverse=True)
         
