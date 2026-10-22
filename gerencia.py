@@ -68,7 +68,7 @@ st.markdown("---")
 if not df.empty:
     df_oc = df[df["orden_compra"] == oc_actual]
     
-    # Filtrar únicamente las observaciones reales (omitiendo "Sin observaciones")
+    # Aislar registros que tienen observaciones reales para contar incidencias
     df_obs = df_oc[
         df_oc["observaciones_turno"].notnull() & 
         (~df_oc["observaciones_turno"].str.strip().str.lower().isin(["sin observaciones", "sin observacion", ""]))
@@ -85,22 +85,27 @@ if not df.empty:
     st.markdown("---")
     st.subheader(f"📅 Bitácora Resumida Diaria - {oc_actual}")
     
-    if not df_obs.empty:
-        fechas_unicas = sorted(df_obs["fecha"].astype(str).unique(), reverse=True)
-        
-        for f in fechas_unicas:
-            df_dia = df_obs[df_obs["fecha"].astype(str) == f]
-            piezas_dia = df_dia["piezas_producidas"].sum()
-            notas_resumidas = " | ".join(df_dia["observaciones_turno"].tolist())
+    # Fechas que contienen al menos una observación real
+    fechas_con_obs = sorted(df_obs["fecha"].astype(str).unique(), reverse=True)
+    
+    if fechas_con_obs:
+        for f in fechas_con_obs:
+            # Suma de TODOS los IDs/registros de esa misma fecha (incluyendo los de "Sin observaciones")
+            df_todos_dia = df_oc[df_oc["fecha"].astype(str) == f]
+            piezas_dia = df_todos_dia["piezas_producidas"].sum()
+            
+            # Observaciones reales de ese día para concatenar en el texto
+            df_obs_dia = df_obs[df_obs["fecha"].astype(str) == f]
+            notas_resumidas = " | ".join(df_obs_dia["observaciones_turno"].tolist())
             
             st.markdown(f"""
             <div style="background-color: #111B2E; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 12px;">
                 <div style="font-size: 16px; font-weight: bold; color: #F8FAFC; margin-bottom: 4px;">📅 Fecha: {f}</div>
-                <div style="color: #94A3B8; font-size: 14px; margin-bottom: 4px;">📦 Producción del día: <b style="color: #F8FAFC;">{piezas_dia} pzas</b></div>
+                <div style="color: #94A3B8; font-size: 14px; margin-bottom: 4px;">📦 Producción total del día: <b style="color: #F8FAFC;">{piezas_dia} pzas</b></div>
                 <div style="color: #E2E8F0; font-size: 14px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
             </div>
             """, unsafe_allow_html=True)
     else:
-        st.success("🎉 No hay incidencias ni retrasos reportados para esta orden. Todos los turnos han operado con normalidad.")
+        st.success("🎉 No hay incidencias ni retrasos reportados para esta orden.")
 else:
     st.info("Aún no hay registros en la base de datos.")
