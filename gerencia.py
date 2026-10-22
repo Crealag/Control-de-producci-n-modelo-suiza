@@ -22,13 +22,11 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS - Paleta Oscura Neutra
+# Estilos CSS
 css_estilos = """
 <style>
 .stApp { background-color: #0A0F1D; color: #F8FAFC; }
-div[data-baseweb="select"] {
-    background-color: #1A263D !important; color: #F8FAFC !important; border-color: #334155 !important;
-}
+div[data-baseweb="select"] { background-color: #1A263D !important; color: #F8FAFC !important; border-color: #334155 !important; }
 .brand-title { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; color: #F8FAFC; }
 [data-testid="stMetricValue"] { color: #F8FAFC !important; font-weight: 800 !important; }
 [data-testid="stMetricLabel"] { color: #94A3B8 !important; font-weight: 700 !important; }
@@ -36,7 +34,7 @@ div[data-baseweb="select"] {
 """
 st.markdown(css_estilos, unsafe_allow_html=True)
 
-# --- FUNCIONES DE CARGA ---
+# --- CARGA DE DATOS ---
 def cargar_datos_supabase():
     if not supabase:
         return pd.DataFrame(columns=["id", "orden_compra", "fecha", "hora", "piezas_producidas", "observaciones_turno"])
@@ -57,7 +55,7 @@ def cargar_catalogo_ocs():
         pass
     return ["HC-0505"]
 
-# --- VISTA PRINCIPAL GERENCIAL ---
+# --- VISTA GERENCIAL ---
 st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Resumen Gerencial Diario</span></h1>", unsafe_allow_html=True)
 st.markdown("---")
 
@@ -70,7 +68,7 @@ st.markdown("---")
 if not df.empty:
     df_oc = df[df["orden_compra"] == oc_actual]
     
-    # Filtrar solo observaciones reales (excluyendo "Sin observaciones")
+    # Filtrar únicamente las observaciones reales (omitiendo "Sin observaciones")
     df_obs = df_oc[
         df_oc["observaciones_turno"].notnull() & 
         (~df_oc["observaciones_turno"].str.strip().str.lower().isin(["sin observaciones", "sin observacion", ""]))
@@ -79,7 +77,6 @@ if not df.empty:
     total_incidencias = len(df_obs)
     total_piezas_oc = df_oc["piezas_producidas"].sum() if not df_oc.empty else 0
     
-    # Métricas superiores
     col1, col2, col3 = st.columns(3)
     col1.metric("Orden Activa", oc_actual)
     col2.metric("Total Producido", f"{total_piezas_oc} pzas")
@@ -89,31 +86,20 @@ if not df.empty:
     st.subheader(f"📅 Bitácora Resumida Diaria - {oc_actual}")
     
     if not df_obs.empty:
-        # Agrupar y resumir por fecha
         fechas_unicas = sorted(df_obs["fecha"].astype(str).unique(), reverse=True)
         
         for f in fechas_unicas:
             df_dia = df_obs[df_obs["fecha"].astype(str) == f]
             piezas_dia = df_dia["piezas_producidas"].sum()
+            notas_resumidas = " | ".join(df_dia["observaciones_turno"].tolist())
             
-            # Concatenar las notas del día en un solo resumen limpio
-            lista_notas = df_dia["observaciones_turno"].tolist()
-            notas_resumidas = " | ".join(lista_notas)
-            
-            # Tarjeta resumen diaria
             st.markdown(f"""
             <div style="background-color: #111B2E; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 12px;">
                 <div style="font-size: 16px; font-weight: bold; color: #F8FAFC; margin-bottom: 4px;">📅 Fecha: {f}</div>
-                <div style="color: #94A3B8; font-size: 14px; margin-bottom: 4px;">📦 Producción total del día: <b style="color: #F8FAFC;">{piezas_dia} pzas</b></div>
+                <div style="color: #94A3B8; font-size: 14px; margin-bottom: 4px;">📦 Producción del día: <b style="color: #F8FAFC;">{piezas_dia} pzas</b></div>
                 <div style="color: #E2E8F0; font-size: 14px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
             </div>
             """, unsafe_allow_html=True)
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("🔍 Ver desglose detallado por turno"):
-            df_detalle = df_obs[["fecha", "hora", "piezas_producidas", "observaciones_turno"]].sort_values(by=["fecha", "hora"], ascending=False)
-            df_detalle.columns = ["Fecha", "Hora", "Piezas", "Observación"]
-            st.dataframe(df_detalle, use_container_width=True, hide_index=True)
     else:
         st.success("🎉 No hay incidencias ni retrasos reportados para esta orden. Todos los turnos han operado con normalidad.")
 else:
