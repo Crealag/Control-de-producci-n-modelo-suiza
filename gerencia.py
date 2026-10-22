@@ -96,7 +96,20 @@ st.markdown("<hr style='border-color: #1E293B; margin-top: 12px; margin-bottom: 
 
 df = cargar_datos_supabase()
 df_ocs_catalogo = cargar_catalogo_ocs()
-lista_ocs = df_ocs_catalogo["orden_compra"].tolist() if not df_ocs_catalogo.empty else ["HC-0505"]
+
+# Construir lista de opciones indicando el estado entre paréntesis si existe
+lista_opciones_mapeo = {}
+lista_ocs_mostrar = []
+if not df_ocs_catalogo.empty:
+    for _, row in df_ocs_catalogo.iterrows():
+        oc_code = str(row["orden_compra"])
+        estado_val = str(row.get("estado", "Activa"))
+        etiqueta_opcion = f"{oc_code} ({estado_val})"
+        lista_opciones_mapeo[etiqueta_opcion] = oc_code
+        lista_ocs_mostrar.append(etiqueta_opcion)
+else:
+    lista_opciones_mapeo = {"HC-0505 (Activa)": "HC-0505"}
+    lista_ocs_mostrar = ["HC-0505 (Activa)"]
 
 # Gestionar estado en session_state para la orden seleccionada
 if "oc_seleccionada" not in st.session_state:
@@ -122,9 +135,13 @@ if st.session_state.oc_seleccionada == "-- Selecciona una Orden de Compra --":
         st.markdown("<p style='color: #38BDF8; font-weight: 600; font-size: 0.95rem; margin-bottom: 8px; text-align: center;'>🎯 SELECCIONA LA ORDEN DE COMPRA A CONSULTAR</p>", unsafe_allow_html=True)
         
         def actualizar_seleccion():
-            st.session_state.oc_seleccionada = st.session_state.widget_selector
+            val_seleccionado = st.session_state.widget_selector
+            if val_seleccionado != "-- Selecciona una Orden de Compra --":
+                st.session_state.oc_seleccionada = lista_opciones_mapeo[val_seleccionado]
+            else:
+                st.session_state.oc_seleccionada = "-- Selecciona una Orden de Compra --"
 
-        opciones_selector = ["-- Selecciona una Orden de Compra --"] + lista_ocs
+        opciones_selector = ["-- Selecciona una Orden de Compra --"] + lista_ocs_mostrar
         st.selectbox("", opciones_selector, key="widget_selector", on_change=actualizar_seleccion, label_visibility="collapsed")
         st.markdown("</div>", unsafe_allow_html=True)
     
@@ -133,14 +150,25 @@ if st.session_state.oc_seleccionada == "-- Selecciona una Orden de Compra --":
 # --- SI YA SE SELECCIONÓ UNA ORDEN: LA BIENVENIDA DESAPARECE Y SE MUESTRA EL CONTENIDO ---
 oc_actual = st.session_state.oc_seleccionada
 
+# Encontrar la etiqueta que corresponde a la orden actual para el selectbox de cambio
+etiqueta_actual_selectbox = "-- Selecciona una Orden de Compra --"
+for etiqueta, codigo in lista_opciones_mapeo.items():
+    if codigo == oc_actual:
+        etiqueta_actual_selectbox = etiqueta
+        break
+
 col_s1, col_s2, col_s3 = st.columns([1, 2, 1])
 with col_s2:
-    opciones_selector = ["-- Selecciona una Orden de Compra --"] + lista_ocs
-    nuevo_cambio = st.selectbox("Cambiar Orden de Compra:", opciones_selector, index=opciones_selector.index(oc_actual) if oc_actual in opciones_selector else 0, key="widget_cambio")
-    if nuevo_cambio != "-- Selecciona una Orden de Compra --" and nuevo_cambio != oc_actual:
-        st.session_state.oc_seleccionada = nuevo_cambio
-        st.rerun()
-    elif nuevo_cambio == "-- Selecciona una Orden de Compra --":
+    opciones_selector = ["-- Selecciona una Orden de Compra --"] + lista_ocs_mostrar
+    idx_default = opciones_selector.index(etiqueta_actual_selectbox) if etiqueta_actual_selectbox in opciones_selector else 0
+    
+    nuevo_cambio = st.selectbox("Cambiar Orden de Compra:", opciones_selector, index=idx_default, key="widget_cambio")
+    if nuevo_cambio != "-- Selecciona una Orden de Compra --":
+        codigo_nuevo = lista_opciones_mapeo[nuevo_cambio]
+        if codigo_nuevo != oc_actual:
+            st.session_state.oc_seleccionada = codigo_nuevo
+            st.rerun()
+    else:
         st.session_state.oc_seleccionada = "-- Selecciona una Orden de Compra --"
         st.rerun()
 
@@ -231,48 +259,4 @@ if not df.empty and "orden_compra" in df.columns:
         with c_lbl:
             semana_seleccionada = semanas_disponibles[st.session_state[key_idx]]
             st.markdown(f"""
-            <div style="background-color: #0F172A; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-                <span style="color: #38BDF8; font-weight: 700; font-size: 16px;">{semana_seleccionada}</span>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        with c_btn2:
-            if st.button("Siguiente ▶", key=f"sig_{oc_actual}", use_container_width=True):
-                if st.session_state[key_idx] < len(semanas_disponibles) - 1:
-                    st.session_state[key_idx] += 1
-                    st.rerun()
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(f"<h4 style='color: #F8FAFC; font-weight: 600; font-size: 1.15rem; margin-bottom: 15px;'>📋 Bitácora y Novedades del Periodo</h4>", unsafe_allow_html=True)
-        
-        df_semana = df_oc[df_oc['semana_label'] == semana_seleccionada]
-        fechas_semana = sorted(df_semana["fecha"].astype(str).unique(), reverse=True)
-        
-        if fechas_semana:
-            for f in fechas_semana:
-                df_todos_dia = df_semana[df_semana["fecha"].astype(str) == f]
-                piezas_dia = df_todos_dia["piezas_producidas"].sum()
-                
-                df_obs_dia = df_todos_dia[
-                    df_todos_dia["observaciones_turno"].notnull() & 
-                    (~df_todos_dia["observaciones_turno"].str.strip().str.lower().isin(["sin observaciones", "sin observacion", ""]))
-                ]
-                
-                if not df_obs_dia.empty:
-                    notas_resumidas = " | ".join(df_obs_dia["observaciones_turno"].tolist())
-                else:
-                    notas_resumidas = "Operación normal (Sin incidencias reportadas)"
-                
-                st.markdown(f"""
-                <div style="background-color: #0F172A; padding: 18px; border-radius: 12px; border-left: 4px solid #38BDF8; border-top: 1px solid #1E293B; border-right: 1px solid #1E293B; border-bottom: 1px solid #1E293B; margin-bottom: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.35);">
-                    <div style="font-size: 15.5px; font-weight: bold; color: #F8FAFC; margin-bottom: 6px;">📅 Fecha: {f}</div>
-                    <div style="color: #94A3B8; font-size: 14px; margin-bottom: 6px;">📦 Producción total del día: <b style="color: #F8FAFC;">{piezas_dia:,} pzas</b></div>
-                    <div style="color: #E2E8F0; font-size: 14px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("No hay registros en esta semana.")
-    else:
-        st.success("🎉 No hay registros de producción para esta orden.")
-else:
-    st.info("Aún no hay registros en la base de datos.")
+            <div style="background-color: #0F172A; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #3
