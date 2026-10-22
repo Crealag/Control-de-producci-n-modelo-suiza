@@ -23,26 +23,26 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- ESTILOS CSS DE ALTA GAMA (LLAVES ESCAPADAS) ---
+# --- ESTILOS CSS DE ALTA GAMA ---
 css_estilos = """
 <style>
-.stApp {{ background-color: #050811; color: #F8FAFC; font-family: 'Inter', sans-serif; }}
-div[data-baseweb="select"] {{ background-color: #0F172A !important; color: #F8FAFC !important; border-color: #334155 !important; border-radius: 10px; }}
-.brand-title {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; color: #F8FAFC; letter-spacing: -0.5px; text-align: center; }}
+.stApp { background-color: #050811; color: #F8FAFC; font-family: 'Inter', sans-serif; }
+div[data-baseweb="select"] { background-color: #0F172A !important; color: #F8FAFC !important; border-color: #334155 !important; border-radius: 10px; }
+.brand-title { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; color: #F8FAFC; letter-spacing: -0.5px; text-align: center; }
 
-[data-testid="stMetricValue"] {{ color: #F8FAFC !important; font-weight: 800 !important; font-size: 1.8rem !important; }}
-[data-testid="stMetricLabel"] {{ color: #94A3B8 !important; font-weight: 600 !important; font-size: 0.85rem !important; text-transform: uppercase; letter-spacing: 0.5px; }}
+[data-testid="stMetricValue"] { color: #F8FAFC !important; font-weight: 800 !important; font-size: 1.8rem !important; }
+[data-testid="stMetricLabel"] { color: #94A3B8 !important; font-weight: 600 !important; font-size: 0.85rem !important; text-transform: uppercase; letter-spacing: 0.5px; }
 
-.exec-card {{
+.exec-card {
     background: linear-gradient(145deg, #0F172A 0%, #1E293B 100%);
     padding: 28px;
     border-radius: 16px;
     border: 1px solid rgba(56, 189, 248, 0.15);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     margin-bottom: 25px;
-}}
+}
 
-.welcome-hero {{
+.welcome-hero {
     background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0B132B 100%);
     padding: 40px;
     border-radius: 20px;
@@ -53,16 +53,16 @@ div[data-baseweb="select"] {{ background-color: #0F172A !important; color: #F8FA
     margin-bottom: 25px;
     box-shadow: 0 15px 35px rgba(0,0,0,0.4);
     text-align: center;
-}}
+}
 
-.selector-container {{
+.selector-container {
     background: #0B132B;
     padding: 24px;
     border-radius: 14px;
     border: 1px solid #1E293B;
     box-shadow: 0 6px 20px rgba(0,0,0,0.3);
     margin-bottom: 30px;
-}}
+}
 </style>
 """
 st.markdown(css_estilos, unsafe_allow_html=True)
@@ -163,4 +163,7 @@ with col_s2:
         st.session_state.oc_seleccionada = "-- Selecciona una Orden de Compra --"
         st.rerun()
 
-st.markdown("<hr style='border-color: #1E293B; margin: 25px 0;'>", unsafe_
+st.markdown("<hr style='border-color: #1E293B; margin: 25px 0;'>", unsafe_allow_html=True)
+
+try:
+    row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc
