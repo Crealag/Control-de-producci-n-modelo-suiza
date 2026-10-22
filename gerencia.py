@@ -68,7 +68,7 @@ st.markdown("---")
 if not df.empty:
     df_oc = df[df["orden_compra"] == oc_actual]
     
-    # Aislar registros que tienen observaciones reales para contar incidencias
+    # Identificar registros con observaciones reales (para el contador de incidencias)
     df_obs = df_oc[
         df_oc["observaciones_turno"].notnull() & 
         (~df_oc["observaciones_turno"].str.strip().str.lower().isin(["sin observaciones", "sin observacion", ""]))
@@ -85,18 +85,25 @@ if not df.empty:
     st.markdown("---")
     st.subheader(f"📅 Bitácora Resumida Diaria - {oc_actual}")
     
-    # Fechas que contienen al menos una observación real
-    fechas_con_obs = sorted(df_obs["fecha"].astype(str).unique(), reverse=True)
+    # Obtener TODAS las fechas registradas en la orden (ordenadas de la más reciente a la más antigua)
+    fechas_todas = sorted(df_oc["fecha"].astype(str).unique(), reverse=True)
     
-    if fechas_con_obs:
-        for f in fechas_con_obs:
-            # Suma de TODOS los IDs/registros de esa misma fecha (incluyendo los de "Sin observaciones")
+    if fechas_todas:
+        for f in fechas_todas:
+            # Todos los registros de esta fecha para sumar la producción total del día
             df_todos_dia = df_oc[df_oc["fecha"].astype(str) == f]
             piezas_dia = df_todos_dia["piezas_producidas"].sum()
             
-            # Observaciones reales de ese día para concatenar en el texto
-            df_obs_dia = df_obs[df_obs["fecha"].astype(str) == f]
-            notas_resumidas = " | ".join(df_obs_dia["observaciones_turno"].tolist())
+            # Filtrar solo las observaciones reales de ese día (excluyendo "Sin observaciones")
+            df_obs_dia = df_todos_dia[
+                df_todos_dia["observaciones_turno"].notnull() & 
+                (~df_todos_dia["observaciones_turno"].str.strip().str.lower().isin(["sin observaciones", "sin observacion", ""]))
+            ]
+            
+            if not df_obs_dia.empty:
+                notas_resumidas = " | ".join(df_obs_dia["observaciones_turno"].tolist())
+            else:
+                notas_resumidas = "Operación normal (Sin incidencias reportadas)"
             
             st.markdown(f"""
             <div style="background-color: #111B2E; padding: 16px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 12px;">
@@ -106,6 +113,6 @@ if not df.empty:
             </div>
             """, unsafe_allow_html=True)
     else:
-        st.success("🎉 No hay incidencias ni retrasos reportados para esta orden.")
+        st.success("🎉 No hay registros de producción para esta orden.")
 else:
     st.info("Aún no hay registros en la base de datos.")
