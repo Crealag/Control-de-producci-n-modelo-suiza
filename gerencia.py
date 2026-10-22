@@ -70,12 +70,16 @@ df_ocs_catalogo = cargar_catalogo_ocs()
 
 lista_ocs = df_ocs_catalogo["orden_compra"].tolist() if not df_ocs_catalogo.empty else ["HC-0505"]
 
-# Selector con el texto exacto solicitado
-oc_actual = st.selectbox("Selecciona la orden de compra a consultar", lista_ocs)
+# Selector con opción inicial vacua para que no despliegue información por defecto
+opciones_selector = ["-- Selecciona una Orden de Compra --"] + lista_ocs
+seleccion = st.selectbox("Selecciona la orden de compra a consultar", opciones_selector)
 
 st.markdown("---")
 
-if oc_actual:
+# Validar si el usuario ya seleccionó una orden real
+if seleccion != "-- Selecciona una Orden de Compra --":
+    oc_actual = seleccion
+
     # Obtener datos de la OC seleccionada
     try:
         row_oc_info = df_ocs_catalogo[df_ocs_catalogo["orden_compra"] == oc_actual].iloc[0]
@@ -199,3 +203,5 @@ if oc_actual:
             st.success("🎉 No hay registros de producción para esta orden.")
     else:
         st.info("Aún no hay registros en la base de datos.")
+else:
+    st.info("👆 Por favor, selecciona una Orden de Compra en el menú desplegable superior para consultar su información.")
