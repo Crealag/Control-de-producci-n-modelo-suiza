@@ -211,7 +211,7 @@ def generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_
     buffer.seek(0)
     return buffer
 
-# --- BARRA LATERAL RESTAURADA ---
+# --- BARRA LATERAL ---
 with st.sidebar:
     st.markdown("<h2 class='brand-title'>crealag</h2>", unsafe_allow_html=True)
     st.caption("Fabricante mueblerio metalformado A.C. e INOX")
@@ -324,45 +324,4 @@ if menu_seleccionado == "📊 Producción y Registro":
         
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("#### 📄 Registros Detallados")
-        st.dataframe(df_oc.sort_values(by="id", ascending=False), use_container_width=True)
-        
-        with st.expander("✏️ Editar o Eliminar un Registro de Producción"):
-            id_sel = st.selectbox("Selecciona ID:", df_oc["id"].tolist())
-            row_sel = df_oc[df_oc["id"] == id_sel].iloc[0]
-            
-            c_e1, c_e2 = st.columns(2)
-            p_edit = c_e1.number_input("Piezas corregidas:", min_value=0, value=int(row_sel["piezas_producidas"]))
-            obs_edit = c_e2.text_input("Obs corregidas:", value=str(row_sel["observaciones_turno"]))
-            
-            cb1, cb2 = st.columns(2)
-            if cb1.button("💾 Guardar Cambios"):
-                actualizar_registro_supabase(id_sel, p_edit, obs_edit)
-                st.success("Actualizado")
-                st.rerun()
-            if cb2.button("🗑️ Eliminar Registro"):
-                eliminar_registro_supabase(id_sel)
-                st.success("Eliminado")
-                st.rerun()
-    else:
-        st.info("Aún no hay registros de producción para esta orden.")
-
-elif menu_seleccionado == "📄 Generador de Remisiones":
-    st.subheader("Generador de Remisiones Oficiales - Formato Original Crealag")
-    df_oc_rem = df[df["orden_compra"] == oc_actual] if not df.empty else pd.DataFrame()
-    piezas_producidas_total = df_oc_rem["piezas_producidas"].sum() if not df_oc_rem.empty else 0
-    piezas_almacen_rem = max(0, piezas_producidas_total - entregadas_actual)
-    
-    st.info(f"📦 **Estado de Almacén para `{oc_actual}`:** Total Producido: **{piezas_producidas_total} pzas** | Ya Entregadas: **{entregadas_actual} pzas** | Disponibles: **{piezas_almacen_rem} pzas**")
-
-    with st.form("form_remision"):
-        col1, col2 = st.columns(2)
-        with col1:
-            atencion = st.text_input("Atención", "Ing. Laura Zamora")
-            compania = st.text_input("Compañía", "Herwong")
-            puesto = st.text_input("Puesto", "Compras")
-            email = st.text_input("Email", "compras.herwong@gmail.com")
-            cel = st.text_input("Cel", "871-1442234")
-        with col2:
-            referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
-            fecha_remision = st.date_input("Fecha de emisión", datetime.now())
-            cantidad_piezas_entrega = st.
+        st.dataframe(df_oc.sort_values(by="
