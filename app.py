@@ -211,7 +211,7 @@ def generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_
     buffer.seek(0)
     return buffer
 
-# --- BARRA LATERAL ---
+# --- BARRA LATERAL RESTAURADA ---
 with st.sidebar:
     st.markdown("<h2 class='brand-title'>crealag</h2>", unsafe_allow_html=True)
     st.caption("Fabricante mueblerio metalformado A.C. e INOX")
@@ -249,3 +249,120 @@ st.markdown("---")
 
 if menu_seleccionado == "📊 Producción y Registro":
     df_oc = df[df["orden_compra"] == oc_actual] if not df.empty else pd.DataFrame()
+    piezas_producidas_oc = df_oc["piezas_producidas"].sum() if not df_oc.empty else 0
+    piezas_almacen_actual = max(0, piezas_producidas_oc - entregadas_actual)
+    porcentaje = min(1.0, piezas_producidas_oc / meta_actual) if meta_actual > 0 else 0.0
+
+    st.subheader(f"Panel de Control - Orden Activa: {oc_actual} ({estado_oc})")
+    
+    with st.expander(f"⚙️ Configurar / Ajustar Orden {oc_actual}"):
+        with st.form("form_edit_oc"):
+            st.markdown("#### Ajustar Datos de la Orden")
+            col_m1, col_m2, col_m3 = st.columns(3)
+            meta_editada = col_m1.number_input("Meta de piezas:", min_value=1, value=meta_actual, step=10)
+            entregadas_editadas = col_m2.number_input("Piezas Entregadas:", min_value=0, value=entregadas_actual, step=1)
+            estado_editado = col_m3.selectbox("Estado de la OC:", ["Activa", "Cerrada"], index=0 if estado_oc == "Activa" else 1)
+            
+            btn_guardar_oc = st.form_submit_button("💾 Guardar Cambios en OC", type="primary")
+            if btn_guardar_oc:
+                if actualizar_oc_supabase(oc_actual, meta_editada, estado_editado, entregadas_editadas):
+                    st.success(f"✅ OC {oc_actual} actualizada correctamente.")
+                    st.rerun()
+
+        st.markdown("---")
+        st.markdown("#### 🗑️ Zona de Peligro")
+        if st.button("⚠️ Eliminar esta Orden de Compra por Completo", key="btn_del_oc_main"):
+            if len(lista_ocs) > 1:
+                if eliminar_oc_supabase(oc_actual):
+                    st.success(f"🗑️ OC {oc_actual} eliminada por completo.")
+                    st.rerun()
+            else:
+                st.error("No puedes eliminar la última Orden de Compra registrada.")
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Meta Estimada OC", f"{meta_actual} pzas")
+    m2.metric("Producido Total", f"{piezas_producidas_oc} pzas")
+    m3.metric("Entregadas / Remitidas", f"{entregadas_actual} pzas")
+    m4.metric("Disponibles en Almacén", f"{piezas_almacen_actual} pzas")
+    st.progress(porcentaje)
+
+    st.markdown("---")
+
+    if estado_oc != "Cerrada":
+        st.subheader("➕ Registrar Piezas Producidas")
+        
+        with st.form("form_registro_produccion"):
+            col_p1, col_p2 = st.columns([1, 2])
+            with col_p1:
+                cantidad_piezas_in = st.number_input("Cantidad de Piezas:", min_value=1, value=10, step=1)
+            with col_p2:
+                obs_in = st.text_input("Observaciones del Turno:", placeholder="Ej. Avance turno mañana...")
+            
+            col_d1, col_d2 = st.columns(2)
+            fecha_in = col_d1.date_input("Fecha de Registro:", value=date.today())
+            hora_in = col_d2.time_input("Hora de Registro:", value=datetime.now().time())
+            
+            btn_registrar = st.form_submit_button("⚡ Registrar Piezas Producidas", type="primary", use_container_width=True)
+            if btn_registrar:
+                f_str = fecha_in.strftime("%Y-%m-%d")
+                h_str = hora_in.strftime("%I:%M %p")
+                insertar_registro(oc_actual, f_str, h_str, cantidad_piezas_in, obs_in if obs_in else "Sin observaciones")
+                st.success(f"✅ ¡Registradas {cantidad_piezas_in} piezas a las {h_str}!")
+                st.rerun()
+
+    st.markdown("---")
+    st.subheader(f"📋 Historial y Ritmo de Producción - {oc_actual}")
+    
+    if not df_oc.empty:
+        df_grafica = df_oc.copy()
+        df_grafica['fecha_str'] = df_grafica['fecha'].astype(str)
+        df_diario = df_grafica.groupby('fecha_str', as_index=False)['piezas_producidas'].sum().sort_values('fecha_str')
+        df_diario.columns = ['Fecha', 'Piezas Producidas']
+        
+        st.markdown("#### 📊 Ritmo de Producción Diaria (Tendencia)")
+        st.line_chart(df_diario, x='Fecha', y='Piezas Producidas', use_container_width=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 📄 Registros Detallados")
+        st.dataframe(df_oc.sort_values(by="id", ascending=False), use_container_width=True)
+        
+        with st.expander("✏️ Editar o Eliminar un Registro de Producción"):
+            id_sel = st.selectbox("Selecciona ID:", df_oc["id"].tolist())
+            row_sel = df_oc[df_oc["id"] == id_sel].iloc[0]
+            
+            c_e1, c_e2 = st.columns(2)
+            p_edit = c_e1.number_input("Piezas corregidas:", min_value=0, value=int(row_sel["piezas_producidas"]))
+            obs_edit = c_e2.text_input("Obs corregidas:", value=str(row_sel["observaciones_turno"]))
+            
+            cb1, cb2 = st.columns(2)
+            if cb1.button("💾 Guardar Cambios"):
+                actualizar_registro_supabase(id_sel, p_edit, obs_edit)
+                st.success("Actualizado")
+                st.rerun()
+            if cb2.button("🗑️ Eliminar Registro"):
+                eliminar_registro_supabase(id_sel)
+                st.success("Eliminado")
+                st.rerun()
+    else:
+        st.info("Aún no hay registros de producción para esta orden.")
+
+elif menu_seleccionado == "📄 Generador de Remisiones":
+    st.subheader("Generador de Remisiones Oficiales - Formato Original Crealag")
+    df_oc_rem = df[df["orden_compra"] == oc_actual] if not df.empty else pd.DataFrame()
+    piezas_producidas_total = df_oc_rem["piezas_producidas"].sum() if not df_oc_rem.empty else 0
+    piezas_almacen_rem = max(0, piezas_producidas_total - entregadas_actual)
+    
+    st.info(f"📦 **Estado de Almacén para `{oc_actual}`:** Total Producido: **{piezas_producidas_total} pzas** | Ya Entregadas: **{entregadas_actual} pzas** | Disponibles: **{piezas_almacen_rem} pzas**")
+
+    with st.form("form_remision"):
+        col1, col2 = st.columns(2)
+        with col1:
+            atencion = st.text_input("Atención", "Ing. Laura Zamora")
+            compania = st.text_input("Compañía", "Herwong")
+            puesto = st.text_input("Puesto", "Compras")
+            email = st.text_input("Email", "compras.herwong@gmail.com")
+            cel = st.text_input("Cel", "871-1442234")
+        with col2:
+            referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
+            fecha_remision = st.date_input("Fecha de emisión", datetime.now())
+            cantidad_piezas_entrega = st.
