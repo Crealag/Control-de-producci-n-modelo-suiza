@@ -182,7 +182,6 @@ def generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_
     story.append(t_campos)
     story.append(Spacer(1, 25))
     
-    # Texto del cuerpo actualizado sin la mención de la fecha de recibido
     texto_cuerpo = f"Referente a su pedido <b><u>{oc_actual}</u></b>. Se hace entrega de <b><u>{cantidad_piezas}</u></b> piezas de respaldo de silla <b><u>modelo Suiza</u></b>."
     style_cuerpo = ParagraphStyle('CuerpoRemision', fontName='Helvetica', fontSize=10.5, leading=16, textColor=colors.HexColor('#0F172A'))
     story.append(Paragraph(texto_cuerpo, style_cuerpo))
@@ -325,7 +324,17 @@ if menu_seleccionado == "📊 Producción y Registro":
         
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("#### 📄 Registros Detallados")
-        st.dataframe(df_oc.sort_values(by="id", ascending=False), use_container_width=True)
+        
+        # --- TABLA CON NOMBRES DE COLUMNAS AMIGABLES ---
+        df_mostrar = df_oc.sort_values(by="id", ascending=False).rename(columns={
+            "id": "ID",
+            "orden_compra": "Orden de Compra",
+            "fecha": "Fecha",
+            "hora": "Hora",
+            "piezas_producidas": "Piezas Producidas",
+            "observaciones_turno": "Observaciones del Turno"
+        })
+        st.dataframe(df_mostrar, use_container_width=True)
         
         with st.expander("✏️ Editar o Eliminar un Registro de Producción"):
             id_sel = st.selectbox("Selecciona ID:", df_oc["id"].tolist())
