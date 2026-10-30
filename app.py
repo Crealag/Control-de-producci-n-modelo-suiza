@@ -144,7 +144,7 @@ df_ocs_catalogo = cargar_catalogo_ocs()
 df = cargar_datos_supabase()
 
 # --- FUNCIÓN GENERADORA DE PDF ---
-def generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_actual, fecha_remision, cantidad_piezas, fecha_recibido_str):
+def generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_actual, fecha_remision, cantidad_piezas):
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=15,
@@ -182,7 +182,8 @@ def generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_
     story.append(t_campos)
     story.append(Spacer(1, 25))
     
-    texto_cuerpo = f"Referente a su pedido <b><u>{oc_actual}</u></b> recibido el <b><u>{fecha_recibido_str}</u></b>. Se hace entrega de <b><u>{cantidad_piezas}</u></b> piezas de respaldo de silla <b><u>modelo Suiza</u></b>."
+    # Texto del cuerpo actualizado sin la mención de la fecha de recibido
+    texto_cuerpo = f"Referente a su pedido <b><u>{oc_actual}</u></b>. Se hace entrega de <b><u>{cantidad_piezas}</u></b> piezas de respaldo de silla <b><u>modelo Suiza</u></b>."
     style_cuerpo = ParagraphStyle('CuerpoRemision', fontName='Helvetica', fontSize=10.5, leading=16, textColor=colors.HexColor('#0F172A'))
     story.append(Paragraph(texto_cuerpo, style_cuerpo))
     story.append(Spacer(1, 260))
@@ -371,21 +372,12 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
                 value=max(1, int(piezas_almacen_rem))
             )
 
-        meses_es = {
-            1: "enero", 2: "febrero", 3: "marzo", 4: "abril",
-            5: "mayo", 6: "junio", 7: "julio", 8: "agosto",
-            9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
-        }
-        
-        fecha_sugerida = f"{fecha_remision.day} de {meses_es[fecha_remision.month]} de {fecha_remision.year}"
-
-        fecha_recibido_str = st.text_input("Fecha de pedido recibido (Texto)", value=fecha_sugerida)
         sumar_a_entregadas = st.checkbox(" Descontar estas piezas de Almacén al generar remisión", value=True)
         submit_pdf = st.form_submit_button("Generar PDF de Remisión Original", type="primary")
 
     if submit_pdf:
         if sumar_a_entregadas:
             registrar_entrega_piezas(oc_actual, cantidad_piezas_entrega)
-        pdf_buffer = generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_actual, fecha_remision, cantidad_piezas_entrega, fecha_recibido_str)
+        pdf_buffer = generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_actual, fecha_remision, cantidad_piezas_entrega)
         st.success(f"¡Remisión por {cantidad_piezas_entrega} piezas generada con éxito y descontada del almacén!")
         st.download_button(label="📥 Descargar Remisión en PDF", data=pdf_buffer, file_name="Remision.pdf", mime="application/pdf")
