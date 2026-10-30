@@ -28,7 +28,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS - Paleta Oscura Neutra
+# Estilos CSS - Paleta Oscura Neutra con Tabla Estilizada y Amigable
 css_estilos = """
 <style>
 .stApp { background-color: #0A0F1D; color: #F8FAFC; }
@@ -51,6 +51,24 @@ button:hover, .stButton>button:hover, [data-testid="baseButton-primary"]:hover {
 .brand-title { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; color: #F8FAFC; }
 [data-testid="stMetricValue"] { color: #F8FAFC !important; font-weight: 800 !important; }
 [data-testid="stMetricLabel"] { color: #94A3B8 !important; font-weight: 700 !important; }
+
+/* Estilos amigables y modernos para la tabla de datos */
+[data-testid="stDataFrame"] {
+    border: 1px solid #334155;
+    border-radius: 12px;
+    overflow: hidden;
+    background-color: #111B2E;
+}
+[data-testid="stDataFrame"] th {
+    background-color: #1E293B !important;
+    color: #38BDF8 !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+}
+[data-testid="stDataFrame"] td {
+    color: #F1F5F9 !important;
+    font-size: 13.5px !important;
+}
 </style>
 """
 st.markdown(css_estilos, unsafe_allow_html=True)
@@ -325,16 +343,22 @@ if menu_seleccionado == "📊 Producción y Registro":
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("#### 📄 Registros Detallados")
         
-        # --- TABLA CON NOMBRES DE COLUMNAS AMIGABLES ---
-        df_mostrar = df_oc.sort_values(by="id", ascending=False).rename(columns={
-            "id": "ID",
-            "orden_compra": "Orden de Compra",
-            "fecha": "Fecha",
-            "hora": "Hora",
-            "piezas_producidas": "Piezas Producidas",
-            "observaciones_turno": "Observaciones del Turno"
-        })
-        st.dataframe(df_mostrar, use_container_width=True)
+        # --- TABLA CON DISEÑO MODERNO Y AMIGABLE ---
+        df_mostrar = df_oc.sort_values(by="id", ascending=False)
+        st.dataframe(
+            df_mostrar,
+            use_container_width=True,
+            hide_index=True,
+            column_order=["id", "orden_compra", "fecha", "hora", "piezas_producidas", "observaciones_turno"],
+            column_config={
+                "id": st.column_config.NumberColumn("ID", width="small"),
+                "orden_compra": st.column_config.TextColumn("Orden de Compra", width="medium"),
+                "fecha": st.column_config.TextColumn("Fecha", width="medium"),
+                "hora": st.column_config.TextColumn("Hora", width="small"),
+                "piezas_producidas": st.column_config.NumberColumn("Piezas Producidas", format="%d pzas", width="medium"),
+                "observaciones_turno": st.column_config.TextColumn("Observaciones del Turno", width="large")
+            }
+        )
         
         with st.expander("✏️ Editar o Eliminar un Registro de Producción"):
             id_sel = st.selectbox("Selecciona ID:", df_oc["id"].tolist())
