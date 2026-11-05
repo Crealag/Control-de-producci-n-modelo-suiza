@@ -318,62 +318,73 @@ if menu_seleccionado == "📊 Producción y Registro":
     st.markdown("---")
 
     if estado_oc != "Cerrada":
-        st.subheader("➕ Registrar Producción o Paro / Incidencia")
-        
+        # Bloque 1: Registrar Producción Normal
+        st.subheader("➕ Registrar Piezas Producidas")
         piezas_restantes = max(0, meta_actual - piezas_producidas_oc)
         
         if piezas_restantes == 0:
             st.success(f"🎉 ¡La Orden `{oc_actual}` ya ha completado el 100% de su meta de producción ({meta_actual} pzas)!")
         else:
             with st.form("form_registro_produccion"):
-                tipo_registro = st.selectbox("Tipo de Registro:", ["🟢 Producción Normal", "⚠️ Paro / Incidencia en Línea"])
-                
                 col_p1, col_p2 = st.columns([1, 2])
+                with col_p1:
+                    cantidad_piezas_in = st.number_input(
+                        "Cantidad de Piezas:", 
+                        min_value=1, 
+                        max_value=int(piezas_restantes), 
+                        value=min(10, int(piezas_restantes)), 
+                        step=1
+                    )
+                with col_p2:
+                    obs_in = st.text_input("Observaciones del Turno:", placeholder="Ej. Avance turno mañana...")
                 
-                if tipo_registro == "🟢 Producción Normal":
-                    with col_p1:
-                        cantidad_piezas_in = st.number_input(
-                            "Cantidad de Piezas:", 
-                            min_value=1, 
-                            max_value=int(piezas_restantes), 
-                            value=min(10, int(piezas_restantes)), 
-                            step=1
-                        )
-                    with col_p2:
-                        obs_in = st.text_input("Observaciones del Turno:", placeholder="Ej. Avance turno mañana...")
-                else:
-                    cantidad_piezas_in = 0
-                    with col_p1:
-                        motivo_paro = st.selectbox("Motivo del Paro:", [
-                            "Paro por falta de material", 
-                            "Paro por mantenimiento preventivo/correctivo", 
-                            "Paro por falta de energía / servicios", 
-                            "Cambio de modelo / herramental", 
-                            "Otro (Especificar en observaciones)"
-                        ])
-                    with col_p2:
-                        detalle_paro = st.text_input("Detalles / Duración del Paro:", placeholder="Ej. Paro 1:30 hrs por ajuste...")
-                    obs_in = f"{motivo_paro} - {detalle_paro}" if detalle_paro else motivo_paro
-
                 col_d1, col_d2 = st.columns(2)
                 fecha_in = col_d1.date_input("Fecha de Registro:", value=date.today())
                 hora_in = col_d2.time_input("Hora de Registro:", value=datetime.now().time())
                 
-                btn_texto = "⚡ Registrar Avance de Producción" if tipo_registro == "🟢 Producción Normal" else "⚠️ Registrar Paro / Incidencia"
-                btn_registrar = st.form_submit_button(btn_texto, type="primary", use_container_width=True)
-                
+                btn_registrar = st.form_submit_button("⚡ Registrar Piezas Producidas", type="primary", use_container_width=True)
                 if btn_registrar:
-                    if tipo_registro == "🟢 Producción Normal" and cantidad_piezas_in > piezas_restantes:
+                    if cantidad_piezas_in > piezas_restantes:
                         st.error(f"❌ No puedes rebasar la meta. Solo faltan {piezas_restantes} piezas para completar los {meta_actual} pzas.")
                     else:
                         f_str = fecha_in.strftime("%Y-%m-%d")
                         h_str = hora_in.strftime("%I:%M %p")
                         insertar_registro(oc_actual, f_str, h_str, cantidad_piezas_in, obs_in if obs_in else "Sin observaciones")
-                        if tipo_registro == "🟢 Producción Normal":
-                            st.success(f"✅ ¡Registradas {cantidad_piezas_in} piezas a las {h_str}!")
-                        else:
-                            st.warning(f"⚠️ Paro registrado correctamente a las {h_str}.")
+                        st.success(f"✅ ¡Registradas {cantidad_piezas_in} piezas a las {h_str}!")
                         st.rerun()
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Bloque 2: Formulario Independiente para Registrar Paros o Incidencias
+        st.subheader("⚠️ Registrar Paro o Incidencia en Línea")
+        with st.form("form_registro_paro"):
+            col_paro1, col_paro2 = st.columns(2)
+            with col_paro1:
+                motivo_paro = st.selectbox("Motivo del Paro:", [
+                    "Paro por falta de material", 
+                    "Paro por mantenimiento preventivo/correctivo", 
+                    "Paro por falta de energía / servicios", 
+                    "Cambio de modelo / herramental", 
+                    "Otro motivo"
+                ])
+            with col_paro2:
+                horas_paro = st.number_input("Duración del Paro (Horas):", min_value=0.25, max_value=24.0, value=1.0, step=0.25)
+            
+            detalle_paro = st.text_input("Detalles adicionales del paro:", placeholder="Ej. Ajuste de dados en línea 2...")
+            
+            col_fd1, col_fd2 = st.columns(2)
+            fecha_paro = col_fd1.date_input("Fecha del Paro:", value=date.today(), key="fecha_paro_key")
+            hora_paro = col_fd2.time_input("Hora del Paro:", value=datetime.now().time(), key="hora_paro_key")
+            
+            btn_paro = st.form_submit_button("🚨 Registrar Paro / Incidencia", type="primary", use_container_width=True)
+            if btn_paro:
+                f_str_p = fecha_paro.strftime("%Y-%m-%d")
+                h_str_p = hora_paro.strftime("%I:%M %p")
+                texto_observacion = f"[PARO: {motivo_paro} | Duración: {horas_paro} hrs] {detalle_paro}" if detalle_paro else f"[PARO: {motivo_paro} | Duración: {horas_paro} hrs]"
+                # Se registran 0 piezas para el paro y la información detallada en observaciones
+                insertar_registro(oc_actual, f_str_p, h_str_p, 0, texto_observacion)
+                st.warning(f"⚠️ Paro registrado correctamente por {horas_paro} hrs ({motivo_paro}).")
+                st.rerun()
 
     st.markdown("---")
     st.subheader(f"📋 Historial y Ritmo de Producción - {oc_actual}")
@@ -402,17 +413,17 @@ if menu_seleccionado == "📊 Producción y Registro":
                 "fecha": st.column_config.TextColumn("Fecha", width="medium"),
                 "hora": st.column_config.TextColumn("Hora", width="small"),
                 "piezas_producidas": st.column_config.NumberColumn("Piezas Producidas", format="%d pzas", width="medium"),
-                "observaciones_turno": st.column_config.TextColumn("Observaciones del Turno", width="large")
+                "observaciones_turno": st.column_config.TextColumn("Observaciones / Paros", width="large")
             }
         )
         
-        with st.expander("✏️ Editar o Eliminar un Registro de Producción"):
+        with st.expander("✏️ Editar o Eliminar un Registro"):
             id_sel = st.selectbox("Selecciona ID:", df_oc["id"].tolist())
             row_sel = df_oc[df_oc["id"] == id_sel].iloc[0]
             
             c_e1, c_e2 = st.columns(2)
             p_edit = c_e1.number_input("Piezas corregidas:", min_value=0, value=int(row_sel["piezas_producidas"]))
-            obs_edit = c_e2.text_input("Obs corregidas:", value=str(row_sel["observaciones_turno"]))
+            obs_edit = c_e2.text_input("Obs / Paro corregido:", value=str(row_sel["observaciones_turno"]))
             
             cb1, cb2 = st.columns(2)
             if cb1.button("💾 Guardar Cambios"):
