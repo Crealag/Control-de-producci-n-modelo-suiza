@@ -247,6 +247,14 @@ with st.sidebar:
     estado_oc = str(row_oc_info.get("estado", "Activa"))
     entregadas_actual = int(row_oc_info.get("piezas_entregadas", 0) if pd.notnull(row_oc_info.get("piezas_entregadas")) else 0)
     
+    # Calcular producción actual para evaluar estado automático
+    df_oc_sidebar_check = df[df["orden_compra"] == oc_actual] if not df.empty else pd.DataFrame()
+    producido_sidebar_check = df_oc_sidebar_check["piezas_producidas"].sum() if not df_oc_sidebar_check.empty else 0
+
+    if producido_sidebar_check >= meta_actual and estado_oc == "Activa":
+        actualizar_oc_supabase(oc_actual, meta_actual, "Cerrada", entregadas_actual)
+        estado_oc = "Cerrada"
+
     if estado_oc == "Cerrada":
         st.error(f"🔒 OC `{oc_actual}` CERRADA (Solo lectura)")
     else:
@@ -270,6 +278,11 @@ if menu_seleccionado == "📊 Producción y Registro":
     piezas_producidas_oc = df_oc["piezas_producidas"].sum() if not df_oc.empty else 0
     piezas_almacen_actual = max(0, piezas_producidas_oc - entregadas_actual)
     porcentaje = min(1.0, piezas_producidas_oc / meta_actual) if meta_actual > 0 else 0.0
+
+    # Auto-actualizar el estado a Cerrada en Supabase si se alcanzó la meta
+    if piezas_producidas_oc >= meta_actual and estado_oc == "Activa":
+        actualizar_oc_supabase(oc_actual, meta_actual, "Cerrada", entregadas_actual)
+        estado_oc = "Cerrada"
 
     st.subheader(f"Panel de Control - Orden Activa: {oc_actual} ({estado_oc})")
     
