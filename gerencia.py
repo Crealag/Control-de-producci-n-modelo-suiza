@@ -182,12 +182,18 @@ if not df.empty and "orden_compra" in df.columns:
     piezas_almacen_actual = max(0, total_piezas_oc - entregadas_actual)
     porcentaje = min(1.0, total_piezas_oc / meta_actual) if meta_actual > 0 else 0.0
     
+    # Mensaje de aviso si la orden está terminada/completada
+    aviso_terminada = ""
+    if total_piezas_oc >= meta_actual:
+        aviso_terminada = '<div style="margin-top: 12px; background-color: rgba(16, 185, 129, 0.15); border: 1px solid #10B981; color: #34D399; padding: 10px 15px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; text-align: center;">✅ ¡Orden de compra terminada y meta completada al 100%!</div>'
+
     st.markdown(f"""
     <div class="exec-card">
-        <div style="font-size: 1.2rem; font-weight: 700; color: #38BDF8; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 1.2rem; font-weight: 700; color: #38BDF8; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
             <span>📊 Estatus de Supervisión — Orden de Compra: {oc_actual}</span>
             <span style="font-size: 0.85rem; background-color: #0284C7; color: #F0F9FF; padding: 4px 12px; border-radius: 6px; font-weight: 600;">{estado_oc}</span>
         </div>
+        {aviso_terminada}
     </div>
     """, unsafe_allow_html=True)
     
