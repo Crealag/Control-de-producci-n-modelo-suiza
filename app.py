@@ -309,24 +309,39 @@ if menu_seleccionado == "📊 Producción y Registro":
     if estado_oc != "Cerrada":
         st.subheader("➕ Registrar Piezas Producidas")
         
-        with st.form("form_registro_produccion"):
-            col_p1, col_p2 = st.columns([1, 2])
-            with col_p1:
-                cantidad_piezas_in = st.number_input("Cantidad de Piezas:", min_value=1, value=10, step=1)
-            with col_p2:
-                obs_in = st.text_input("Observaciones del Turno:", placeholder="Ej. Avance turno mañana...")
-            
-            col_d1, col_d2 = st.columns(2)
-            fecha_in = col_d1.date_input("Fecha de Registro:", value=date.today())
-            hora_in = col_d2.time_input("Hora de Registro:", value=datetime.now().time())
-            
-            btn_registrar = st.form_submit_button("⚡ Registrar Piezas Producidas", type="primary", use_container_width=True)
-            if btn_registrar:
-                f_str = fecha_in.strftime("%Y-%m-%d")
-                h_str = hora_in.strftime("%I:%M %p")
-                insertar_registro(oc_actual, f_str, h_str, cantidad_piezas_in, obs_in if obs_in else "Sin observaciones")
-                st.success(f"✅ ¡Registradas {cantidad_piezas_in} piezas a las {h_str}!")
-                st.rerun()
+        # Límite máximo de piezas que faltan para alcanzar la meta
+        piezas_restantes = max(0, meta_actual - piezas_producidas_oc)
+        
+        if piezas_restantes == 0:
+            st.success(f"🎉 ¡La Orden `{oc_actual}` ya ha completado el 100% de su meta de producción ({meta_actual} pzas)!")
+        else:
+            with st.form("form_registro_produccion"):
+                col_p1, col_p2 = st.columns([1, 2])
+                with col_p1:
+                    cantidad_piezas_in = st.number_input(
+                        "Cantidad de Piezas:", 
+                        min_value=1, 
+                        max_value=int(piezas_restantes), 
+                        value=min(10, int(piezas_restantes)), 
+                        step=1
+                    )
+                with col_p2:
+                    obs_in = st.text_input("Observaciones del Turno:", placeholder="Ej. Avance turno mañana...")
+                
+                col_d1, col_d2 = st.columns(2)
+                fecha_in = col_d1.date_input("Fecha de Registro:", value=date.today())
+                hora_in = col_d2.time_input("Hora de Registro:", value=datetime.now().time())
+                
+                btn_registrar = st.form_submit_button("⚡ Registrar Piezas Producidas", type="primary", use_container_width=True)
+                if btn_registrar:
+                    if cantidad_piezas_in > piezas_restantes:
+                        st.error(f"❌ No puedes rebasar la meta. Solo faltan {piezas_restantes} piezas para completar los {meta_actual} pzas.")
+                    else:
+                        f_str = fecha_in.strftime("%Y-%m-%d")
+                        h_str = hora_in.strftime("%I:%M %p")
+                        insertar_registro(oc_actual, f_str, h_str, cantidad_piezas_in, obs_in if obs_in else "Sin observaciones")
+                        st.success(f"✅ ¡Registradas {cantidad_piezas_in} piezas a las {h_str}!")
+                        st.rerun()
 
     st.markdown("---")
     st.subheader(f"📋 Historial y Ritmo de Producción - {oc_actual}")
