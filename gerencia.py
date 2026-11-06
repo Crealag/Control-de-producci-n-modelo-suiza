@@ -208,17 +208,17 @@ if not df.empty and "orden_compra" in df.columns:
     st.markdown("<br>", unsafe_allow_html=True)
     
     if not df_oc.empty:
-        df_oc['fecha_dt'] = pd.to_datetime(df_oc['fecha'])
-        
-        df_oc['inicio_semana'] = df_oc['fecha_dt'] - pd.to_timedelta(df_oc['fecha_dt'].dt.dayofweek, unit='d')
-        df_oc['fin_semana'] = df_oc['inicio_semana'] + pd.to_timedelta(6, unit='d')
-        
-        df_oc['semana_label'] = (
-            "Del " + df_oc['inicio_semana'].dt.strftime('%d/%m/%Y') + 
-            " al " + df_oc['fin_semana'].dt.strftime('%d/%m/%Y')
+        # Creamos un campo de fecha datetime en todo el DataFrame general para calcular semanas de manera consistente
+        df['fecha_dt'] = pd.to_datetime(df['fecha'])
+        df['inicio_semana'] = df['fecha_dt'] - pd.to_timedelta(df['fecha_dt'].dt.dayofweek, unit='d')
+        df['fin_semana'] = df['inicio_semana'] + pd.to_timedelta(6, unit='d')
+        df['semana_label'] = (
+            "Del " + df['inicio_semana'].dt.strftime('%d/%m/%Y') + 
+            " al " + df['fin_semana'].dt.strftime('%d/%m/%Y')
         )
-        
-        df_semanas_ordenadas = df_oc[['semana_label', 'inicio_semana']].drop_duplicates().sort_values('inicio_semana')
+
+        df_oc_semana_base = df[df["orden_compra"] == oc_actual]
+        df_semanas_ordenadas = df_oc_semana_base[['semana_label', 'inicio_semana']].drop_duplicates().sort_values('inicio_semana')
         semanas_disponibles = df_semanas_ordenadas['semana_label'].tolist()
         
         hoy = pd.Timestamp(date.today())
@@ -266,18 +266,24 @@ if not df.empty and "orden_compra" in df.columns:
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("<h4 style='color: #F8FAFC; font-weight: 600; font-size: 1.15rem; margin-bottom: 15px;'>📋 Bitácora y Novedades del Periodo</h4>", unsafe_allow_html=True)
         
-        df_semana = df_oc[df_oc['semana_label'] == semana_seleccionada]
-        fechas_semana = sorted(df_semana["fecha"].astype(str).unique(), reverse=True)
+        # Obtenemos las fechas de la semana seleccionada para esta OC
+        df_semana_oc = df_oc_semana_base[df_oc_semana_base['semana_label'] == semana_seleccionada]
+        fechas_semana = sorted(df_semana_oc["fecha"].astype(str).unique(), reverse=True)
         
         if fechas_semana:
             for f in fechas_semana:
-                # Filtrar exclusivamente por fecha Y por la orden de compra actual
-                df_todos_dia = df_semana[df_semana["fecha"].astype(str) == f]
-                piezas_dia = df_todos_dia["piezas_producidas"].sum()
+                # 1. Producción TOTAL de toda la planta en ese día (para ver el total real del día sin importar cambios de orden)
+                df_dia_general = df[df["fecha"].astype(str) == f]
+                piezas_dia_total = df_dia_general["piezas_producidas"].sum()
                 
-                df_obs_dia = df_todos_dia[
-                    df_todos_dia["observaciones_turno"].notnull() & 
-                    (~df_todos_dia["observaciones_turno"].str.strip().str.lower().isin(["sin observaciones", "sin observacion", ""]))
+                # 2. Producción específica de ESTA orden de compra en ese día
+                df_dia_oc = df_semana_oc[df_semana_oc["fecha"].astype(str) == f]
+                piezas_dia_oc = df_dia_oc["piezas_producidas"].sum()
+                
+                # Observaciones / paros registrados en esta OC para ese día
+                df_obs_dia = df_dia_oc[
+                    df_dia_oc["observaciones_turno"].notnull() & 
+                    (~df_dia_oc["observaciones_turno"].str.strip().str.lower().isin(["sin observaciones", "sin observacion", ""]))
                 ]
                 
                 if not df_obs_dia.empty:
@@ -288,8 +294,8 @@ if not df.empty and "orden_compra" in df.columns:
                 st.markdown(f"""
                 <div style="background-color: #0F172A; padding: 18px; border-radius: 12px; border-left: 4px solid #38BDF8; border-top: 1px solid #1E293B; border-right: 1px solid #1E293B; border-bottom: 1px solid #1E293B; margin-bottom: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.35);">
                     <div style="font-size: 15.5px; font-weight: bold; color: #F8FAFC; margin-bottom: 6px;">📅 Fecha: {f}</div>
-                    <div style="color: #94A3B8; font-size: 14px; margin-bottom: 6px;">📦 Producción total de esta OC en el día: <b style="color: #F8FAFC;">{piezas_dia:,} pzas</b></div>
-                    <div style="color: #E2E8F0; font-size: 14px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
+                    <div style="color: #94A3B8; font-size: 14px; margin-bottom: 4px;">🏭 Producción total de planta en el día: <b style="color: #38BDF8;">{piezas_dia_total:,} pzas</b> <span style="font-size: 12px; color: #64748B;">(De esta OC: {piezas_dia_oc:,} pzas)</span></div>
+                    <div style="color: #E2E8F0; font-size: 14px; margin-top: 6px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
                 </div>
                 """, unsafe_allow_html=True)
         else:
