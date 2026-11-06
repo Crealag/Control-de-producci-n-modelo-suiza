@@ -182,7 +182,6 @@ if not df.empty and "orden_compra" in df.columns:
     piezas_almacen_actual = max(0, total_piezas_oc - entregadas_actual)
     porcentaje = min(1.0, total_piezas_oc / meta_actual) if meta_actual > 0 else 0.0
     
-    # Mensaje de aviso si la orden está terminada/completada
     aviso_terminada = ""
     if total_piezas_oc >= meta_actual:
         aviso_terminada = '<div style="margin-top: 12px; background-color: rgba(16, 185, 129, 0.15); border: 1px solid #10B981; color: #34D399; padding: 10px 15px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; text-align: center;">✅ ¡Orden de compra terminada y meta completada al 100%!</div>'
@@ -272,6 +271,7 @@ if not df.empty and "orden_compra" in df.columns:
         
         if fechas_semana:
             for f in fechas_semana:
+                # Filtrar exclusivamente por fecha Y por la orden de compra actual
                 df_todos_dia = df_semana[df_semana["fecha"].astype(str) == f]
                 piezas_dia = df_todos_dia["piezas_producidas"].sum()
                 
@@ -288,7 +288,7 @@ if not df.empty and "orden_compra" in df.columns:
                 st.markdown(f"""
                 <div style="background-color: #0F172A; padding: 18px; border-radius: 12px; border-left: 4px solid #38BDF8; border-top: 1px solid #1E293B; border-right: 1px solid #1E293B; border-bottom: 1px solid #1E293B; margin-bottom: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.35);">
                     <div style="font-size: 15.5px; font-weight: bold; color: #F8FAFC; margin-bottom: 6px;">📅 Fecha: {f}</div>
-                    <div style="color: #94A3B8; font-size: 14px; margin-bottom: 6px;">📦 Producción total del día: <b style="color: #F8FAFC;">{piezas_dia:,} pzas</b></div>
+                    <div style="color: #94A3B8; font-size: 14px; margin-bottom: 6px;">📦 Producción total de esta OC en el día: <b style="color: #F8FAFC;">{piezas_dia:,} pzas</b></div>
                     <div style="color: #E2E8F0; font-size: 14px;">📝 <b>Motivo / Novedades:</b> {notas_resumidas}</div>
                 </div>
                 """, unsafe_allow_html=True)
