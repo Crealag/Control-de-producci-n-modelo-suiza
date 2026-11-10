@@ -459,18 +459,27 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
         with col2:
             referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
             fecha_remision = st.date_input("Fecha de emisión", datetime.now())
+            
+            # BLOQUEO ESTRICTO: Límite máximo en el input basado en las piezas disponibles en almacén
+            max_val_permitido = max(1, int(piezas_almacen_rem))
             cantidad_piezas_entrega = st.number_input(
                 "Cantidad de piezas a entregar en esta remisión", 
                 min_value=1, 
-                value=max(1, int(piezas_almacen_rem))
+                max_value=max_val_permitido,
+                value=max_val_permitido
             )
 
         sumar_a_entregadas = st.checkbox(" Descontar estas piezas de Almacén al generar remisión", value=True)
         submit_pdf = st.form_submit_button("Generar PDF de Remisión Original", type="primary")
 
     if submit_pdf:
-        if sumar_a_entregadas:
-            registrar_entrega_piezas(oc_actual, cantidad_piezas_entrega)
-        pdf_buffer = generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_actual, fecha_remision, cantidad_piezas_entrega)
-        st.success(f"¡Remisión por {cantidad_piezas_entrega} piezas generada con éxito y descontada del almacén!")
-        st.download_button(label="📥 Descargar Remisión en PDF", data=pdf_buffer, file_name="Remision.pdf", mime="application/pdf")
+        if piezas_almacen_rem <= 0:
+            st.error("❌ No hay piezas disponibles en almacén para remitir en esta Orden de Compra.")
+        elif cantidad_piezas_entrega > piezas_almacen_rem:
+            st.error(f"❌ No puedes remitir {cantidad_piezas_entrega} piezas. Solo hay {piezas_almacen_rem} piezas disponibles en almacén.")
+        else:
+            if sumar_a_entregadas:
+                registrar_entrega_piezas(oc_actual, cantidad_piezas_entrega)
+            pdf_buffer = generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_actual, fecha_remision, cantidad_piezas_entrega)
+            st.success(f"¡Remisión por {cantidad_piezas_entrega} piezas generada con éxito y descontada del almacén!")
+            st.download_button(label="📥 Descargar Remisión en PDF", data=pdf_buffer, file_name="Remision.pdf", mime="application/pdf")
