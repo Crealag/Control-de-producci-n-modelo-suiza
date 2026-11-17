@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import math
 from datetime import datetime, date
 from io import BytesIO
 from supabase import create_client
@@ -52,7 +53,6 @@ button:hover, .stButton>button:hover, [data-testid="baseButton-primary"]:hover {
 [data-testid="stMetricValue"] { color: #F8FAFC !important; font-weight: 800 !important; }
 [data-testid="stMetricLabel"] { color: #94A3B8 !important; font-weight: 700 !important; }
 
-/* Estilos amigables y modernos para la tabla de datos */
 [data-testid="stDataFrame"] {
     border: 1px solid #334155;
     border-radius: 12px;
@@ -161,6 +161,79 @@ def eliminar_registro_supabase(record_id):
 df_ocs_catalogo = cargar_catalogo_ocs()
 df = cargar_datos_supabase()
 
+# --- FUNCIÓN DE CÁLCULO DE MATERIALES Y GENERACIÓN DE EXCEL ---
+def calcular_requerimiento_materiales(meta_pzas, proveedor_acero="ACEROMEX"):
+    # Base de consumo extraída de la corrida estándar de 1700 respaldos silla Roma
+    BASE_PIEZAS = 1700.0
+    
+    pu_semiflecha = 39.47 if proveedor_acero == "ACEROMEX" else 45.78
+    pu_solera = 55.81 if proveedor_acero == "ACEROMEX" else 53.57
+    
+    items = [
+        # Materiales Principales
+        {"Categoría": "Material Principal", "Concepto": 'Semiflecha 1/4"', "Base_1700": 1340, "PU_cIVA": pu_semiflecha, "Proveedor": proveedor_acero},
+        {"Categoría": "Material Principal", "Concepto": 'Solera 1/8" x 1/2"', "Base_1700": 230, "PU_cIVA": pu_solera, "Proveedor": proveedor_acero},
+        {"Categoría": "Material Principal", "Concepto": "Gas CO2 25 Kg", "Base_1700": 7, "PU_cIVA": 950.00, "Proveedor": "PROVEEDOR GAS"},
+        {"Categoría": "Material Principal", "Concepto": "Soldadura 5 Kg", "Base_1700": 12, "PU_cIVA": 360.40, "Proveedor": "RUEDAS Y RODAJAS"},
+        # Consumibles Fijos
+        {"Categoría": "Consumible", "Concepto": 'Disco de corte 4 1/2"', "Base_1700": 34, "PU_cIVA": 12.18, "Proveedor": "RUEDAS Y RODAJAS"},
+        {"Categoría": "Consumible", "Concepto": "Disco de lija", "Base_1700": 34, "PU_cIVA": 44.08, "Proveedor": "RUEDAS Y RODAJAS"},
+        {"Categoría": "Consumible", "Concepto": 'Disco de corte 14"', "Base_1700": 19, "PU_cIVA": 67.28, "Proveedor": "RUEDAS Y RODAJAS"},
+        {"Categoría": "Consumible", "Concepto": 'Broca 3/16"', "Base_1700": 13, "PU_cIVA": 28.00, "Proveedor": "RUEDAS Y RODAJAS"},
+        {"Categoría": "Consumible", "Concepto": "Cintas de aislar", "Base_1700": 18, "PU_cIVA": 20.00, "Proveedor": "RUEDAS Y RODAJAS"},
+    ]
+    
+    filas = []
+    for it in items:
+        exacto = (it["Base_1700"] / BASE_PIEZAS) * meta_pzas
+        a_comprar = math.ceil(exacto) if meta_pzas > 0 else 0
+        total = round(a_comprar * it["PU_cIVA"], 2)
+        filas.append({
+            "Categoría": it["Categoría"],
+            "Concepto": it["Concepto"],
+            "Consumo Exacto": round(exacto, 2),
+            "Cantidad a Comprar (Enteros)": int(a_comprar),
+            "P.U. c/IVA ($)": it["PU_cIVA"],
+            "Total c/IVA ($)": total,
+            "Proveedor": it["Proveedor"]
+        })
+    return pd.DataFrame(filas)
+
+def generar_excel_costeo(df_costeo, meta_pzas, oc_ref, proveedor_acero):
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df_principal = df_costeo[df_costeo["Categoría"] == "Material Principal"].drop(columns=["Categoría"])
+        df_consumibles = df_costeo[df_costeo["Categoría"] == "Consumible"].drop(columns=["Categoría"])
+        
+        # Hoja 1: Requerimiento Completo Consolidado
+        df_costeo.to_excel(writer, sheet_name="Requerimiento_Compras", index=False, startrow=4)
+        ws = writer.sheets["Requerimiento_Compras"]
+        ws["A1"] = f"CREALAG - EXPLOSIÓN DE MATERIALES Y COSTEO (OC: {oc_ref})"
+        ws["A2"] = f"Meta de Producción: {meta_pzas:,} piezas | Proveedor Acero: {proveedor_acero} | Fecha: {date.today().strftime('%d/%m/%Y')}"
+        
+        # Fila de Total General
+        ultima_fila = 5 + len(df_costeo) + 1
+        ws[f"E{ultima_fila}"] = "TOTAL GENERAL c/IVA:"
+        ws[f"F{ultima_fila}"] = f"=SUM(F6:F{ultima_fila-1})"
+        
+        # Hoja 2: Desglose Separado (Estilo Excel Principal)
+        df_principal.to_excel(writer, sheet_name="Desglose_Detallado", index=False, startrow=2)
+        ws2 = writer.sheets["Desglose_Detallado"]
+        ws2["A1"] = f"MATERIAL PRINCIPAL PARA {meta_pzas:,} PIEZAS"
+        
+        fila_inicio_cons = 2 + len(df_principal) + 4
+        ws2[f"A{fila_inicio_cons-1}"] = "DESGLOSE DE CONSUMIBLES"
+        df_consumibles.to_excel(writer, sheet_name="Desglose_Detallado", index=False, startrow=fila_inicio_cons)
+
+        # Ajustar ancho de columnas automáticamente
+        for sheet in writer.sheets.values():
+            for col in sheet.columns:
+                max_len = max((len(str(cell.value or "")) for cell in col), default=12)
+                sheet.column_dimensions[col[0].column_letter].width = min(max_len + 4, 38)
+
+    buffer.seek(0)
+    return buffer
+
 # --- FUNCIÓN GENERADORA DE PDF ---
 def generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_actual, fecha_remision, cantidad_piezas):
     buffer = BytesIO()
@@ -235,7 +308,10 @@ with st.sidebar:
     st.caption("Fabricante mueblerio metalformado A.C. e INOX")
     st.markdown("---")
     
-    menu_seleccionado = st.selectbox("Navegación del Sistema", ["📊 Producción y Registro", "📄 Generador de Remisiones"])
+    menu_seleccionado = st.selectbox(
+        "Navegación del Sistema", 
+        ["📊 Producción y Registro", "💰 Costeo y Materiales (Excel)", "📄 Generador de Remisiones"]
+    )
     st.markdown("---")
     
     st.header("📦 Órdenes de Compra")
@@ -318,7 +394,6 @@ if menu_seleccionado == "📊 Producción y Registro":
     st.markdown("---")
 
     if estado_oc != "Cerrada":
-        # Bloque 1: Registrar Producción Normal
         st.subheader("➕ Registrar Piezas Producidas")
         piezas_restantes = max(0, meta_actual - piezas_producidas_oc)
         
@@ -355,7 +430,6 @@ if menu_seleccionado == "📊 Producción y Registro":
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Bloque 2: Formulario Independiente para Registrar Paros o Incidencias
         st.subheader("⚠️ Registrar Paro o Incidencia en Línea")
         with st.form("form_registro_paro"):
             col_paro1, col_paro2 = st.columns(2)
@@ -440,6 +514,63 @@ if menu_seleccionado == "📊 Producción y Registro":
     else:
         st.info("Aún no hay registros para esta orden.")
 
+elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
+    st.subheader(f"💰 Explosión de Materiales y Costeo de Compra — Ref: {oc_actual}")
+    st.caption("Calcula automáticamente la cantidad exacta de acero y consumibles a comprar (redondeado a unidades enteras de compra) con base en la corrida estándar de Respaldos Silla Roma.")
+
+    col_c1, col_c2 = st.columns([1, 1])
+    with col_c1:
+        meta_costeo = st.number_input(
+            "Meta de Piezas a Cotizar / Producir:", 
+            min_value=1, 
+            value=meta_actual, 
+            step=50,
+            help="Por defecto carga la meta de la OC activa, pero puedes poner cualquier cantidad para simular compras."
+        )
+    with col_c2:
+        proveedor_sel = st.selectbox(
+            "Proveedor Principal de Acero (Semiflecha y Solera):", 
+            ["ACEROMEX", "VENTACERO"]
+        )
+
+    df_costeo = calcular_requerimiento_materiales(meta_costeo, proveedor_sel)
+
+    costo_material_principal = df_costeo[df_costeo["Categoría"] == "Material Principal"]["Total c/IVA ($)"].sum()
+    costo_consumibles = df_costeo[df_costeo["Categoría"] == "Consumible"]["Total c/IVA ($)"].sum()
+    costo_total_general = df_costeo["Total c/IVA ($)"].sum()
+    costo_unitario_pza = costo_total_general / meta_costeo if meta_costeo > 0 else 0
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Material Principal (c/IVA)", f"${costo_material_principal:,.2f}")
+    k2.metric("Consumibles (c/IVA)", f"${costo_consumibles:,.2f}")
+    k3.metric("Inversión Total Compra", f"${costo_total_general:,.2f}")
+    k4.metric("Costo Directo / Pieza", f"${costo_unitario_pza:,.2f}")
+
+    st.markdown("---")
+    st.markdown("#### 📋 Lista de Requerimiento para Compras")
+    st.dataframe(
+        df_costeo,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Consumo Exacto": st.column_config.NumberColumn("Consumo Teórico", format="%.2f"),
+            "Cantidad a Comprar (Enteros)": st.column_config.NumberColumn("A Comprar (Cerrado)", format="%d u."),
+            "P.U. c/IVA ($)": st.column_config.NumberColumn("P.U. c/IVA", format="$%.2f"),
+            "Total c/IVA ($)": st.column_config.NumberColumn("Subtotal c/IVA", format="$%,.2f"),
+        }
+    )
+
+    excel_buffer = generar_excel_costeo(df_costeo, meta_costeo, oc_actual, proveedor_sel)
+    st.download_button(
+        label="📥 Descargar Requerimiento y Costeo en Excel (.xlsx)",
+        data=excel_buffer,
+        file_name=f"Costeo_Materiales_{oc_actual}_{meta_costeo}pzas.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        type="primary",
+        use_container_width=True
+    )
+
 elif menu_seleccionado == "📄 Generador de Remisiones":
     st.subheader("Generador de Remisiones Oficiales - Formato Original Crealag")
     df_oc_rem = df[df["orden_compra"] == oc_actual] if not df.empty else pd.DataFrame()
@@ -460,7 +591,6 @@ elif menu_seleccionado == "📄 Generador de Remisiones":
             referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
             fecha_remision = st.date_input("Fecha de emisión", datetime.now())
             
-            # BLOQUEO ESTRICTO: Límite máximo en el input basado en las piezas disponibles en almacén
             max_val_permitido = max(1, int(piezas_almacen_rem))
             cantidad_piezas_entrega = st.number_input(
                 "Cantidad de piezas a entregar en esta remisión", 
