@@ -383,6 +383,7 @@ if menu_seleccionado == "📊 Producción y Registro":
     st.markdown("---")
 
     if estado_oc != "Cerrada":
+        # Bloque 1: Registrar Producción Normal
         st.subheader("➕ Registrar Piezas Producidas")
         piezas_restantes = max(0, meta_actual - piezas_producidas_oc)
         
@@ -406,4 +407,200 @@ if menu_seleccionado == "📊 Producción y Registro":
                 fecha_in = col_d1.date_input("Fecha de Registro:", value=date.today())
                 hora_in = col_d2.time_input("Hora de Registro:", value=datetime.now().time())
                 
-                btn_registrar = st.form_submit_button("⚡ Registrar Piezas Producidas", type="primary", use
+                btn_registrar = st.form_submit_button("⚡ Registrar Piezas Producidas", type="primary", use_container_width=True)
+                if btn_registrar:
+                    if cantidad_piezas_in > piezas_restantes:
+                        st.error(f"❌ No puedes rebasar la meta. Solo faltan {piezas_restantes} piezas para completar los {meta_actual} pzas.")
+                    else:
+                        f_str = fecha_in.strftime("%Y-%m-%d")
+                        h_str = hora_in.strftime("%I:%M %p")
+                        insertar_registro(oc_actual, f_str, h_str, cantidad_piezas_in, obs_in if obs_in else "Sin observaciones")
+                        st.success(f"✅ ¡Registradas {cantidad_piezas_in} piezas a las {h_str}!")
+                        st.rerun()
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Bloque 2: Formulario Independiente para Registrar Paros o Incidencias
+        st.subheader("⚠️ Registrar Paro o Incidencia en Línea")
+        with st.form("form_registro_paro"):
+            col_paro1, col_paro2 = st.columns(2)
+            with col_paro1:
+                motivo_paro = st.selectbox("Motivo del Paro:", [
+                    "Paro por falta de material", 
+                    "Paro por mantenimiento preventivo/correctivo", 
+                    "Paro por falta de energía / servicios", 
+                    "Cambio de modelo / herramental", 
+                    "Otro motivo"
+                ])
+            with col_paro2:
+                horas_paro = st.number_input("Duración del Paro (Horas):", min_value=0.25, max_value=24.0, value=1.0, step=0.25)
+            
+            detalle_paro = st.text_input("Detalles adicionales del paro:", placeholder="Ej. Ajuste de dados en línea 2...")
+            
+            col_fd1, col_fd2 = st.columns(2)
+            fecha_paro = col_fd1.date_input("Fecha del Paro:", value=date.today(), key="fecha_paro_key")
+            hora_paro = col_fd2.time_input("Hora del Paro:", value=datetime.now().time(), key="hora_paro_key")
+            
+            btn_paro = st.form_submit_button("🚨 Registrar Paro / Incidencia", type="primary", use_container_width=True)
+            if btn_paro:
+                f_str_p = fecha_paro.strftime("%Y-%m-%d")
+                h_str_p = hora_paro.strftime("%I:%M %p")
+                texto_observacion = f"[PARO: {motivo_paro} | Duración: {horas_paro} hrs] {detalle_paro}" if detalle_paro else f"[PARO: {motivo_paro} | Duración: {horas_paro} hrs]"
+                insertar_registro(oc_actual, f_str_p, h_str_p, 0, texto_observacion)
+                st.warning(f"⚠️ Paro registrado correctamente por {horas_paro} hrs ({motivo_paro}).")
+                st.rerun()
+
+    st.markdown("---")
+    st.subheader(f"📋 Historial y Ritmo de Producción - {oc_actual}")
+    
+    if not df_oc.empty:
+        df_solo_produccion = df_oc[df_oc["piezas_producidas"] > 0].copy()
+        
+        if not df_solo_produccion.empty:
+            df_solo_produccion['fecha_str'] = df_solo_produccion['fecha'].astype(str)
+            df_diario = df_solo_produccion.groupby('fecha_str', as_index=False)['piezas_producidas'].sum().sort_values('fecha_str')
+            df_diario.columns = ['Fecha', 'Piezas Producidas']
+            
+            st.markdown("#### 📊 Ritmo de Producción Diaria (Tendencia)")
+            st.line_chart(df_diario, x='Fecha', y='Piezas Producidas', use_container_width=True)
+        else:
+            st.info("ℹ️ Aún no hay registros de producción con piezas para mostrar en la gráfica (solo paros registrados).")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 📄 Registros Detallados (Producción y Paros)")
+        
+        df_mostrar = df_oc.sort_values(by="id", ascending=False)
+        st.dataframe(
+            df_mostrar,
+            use_container_width=True,
+            hide_index=True,
+            column_order=["id", "orden_compra", "fecha", "hora", "piezas_producidas", "observaciones_turno"],
+            column_config={
+                "id": st.column_config.NumberColumn("ID", width="small"),
+                "orden_compra": st.column_config.TextColumn("Orden de Compra", width="medium"),
+                "fecha": st.column_config.TextColumn("Fecha", width="medium"),
+                "hora": st.column_config.TextColumn("Hora", width="small"),
+                "piezas_producidas": st.column_config.NumberColumn("Piezas Producidas", format="%d pzas", width="medium"),
+                "observaciones_turno": st.column_config.TextColumn("Observaciones / Paros", width="large")
+            }
+        )
+        
+        with st.expander("✏️ Editar o Eliminar un Registro"):
+            id_sel = st.selectbox("Selecciona ID:", df_oc["id"].tolist())
+            row_sel = df_oc[df_oc["id"] == id_sel].iloc[0]
+            
+            c_e1, c_e2 = st.columns(2)
+            p_edit = c_e1.number_input("Piezas corregidas:", min_value=0, value=int(row_sel["piezas_producidas"]))
+            obs_edit = c_e2.text_input("Obs / Paro corregido:", value=str(row_sel["observaciones_turno"]))
+            
+            cb1, cb2 = st.columns(2)
+            if cb1.button("💾 Guardar Cambios"):
+                actualizar_registro_supabase(id_sel, p_edit, obs_edit)
+                st.success("Actualizado")
+                st.rerun()
+            if cb2.button("🗑️ Eliminar Registro"):
+                eliminar_registro_supabase(id_sel)
+                st.success("Eliminado")
+                st.rerun()
+    else:
+        st.info("Aún no hay registros para esta orden.")
+
+elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
+    st.subheader(f"💰 Explosión de Materiales y Costeo de Compra — Ref: {oc_actual}")
+    st.caption("Calcula automáticamente la cantidad exacta de acero y consumibles a comprar (redondeado a unidades enteras de compra) con base en la corrida estándar de Respaldos Silla Roma.")
+
+    col_c1, col_c2 = st.columns([1, 1])
+    with col_c1:
+        meta_costeo = st.number_input(
+            "Meta de Piezas a Cotizar / Producir:", 
+            min_value=1, 
+            value=meta_actual, 
+            step=50,
+            help="Por defecto carga la meta de la OC activa, pero puedes poner cualquier cantidad para simular compras."
+        )
+    with col_c2:
+        proveedor_sel = st.selectbox(
+            "Proveedor Principal de Acero (Semiflecha y Solera):", 
+            ["ACEROMEX", "VENTACERO"]
+        )
+
+    df_costeo = calcular_requerimiento_materiales(meta_costeo, proveedor_sel)
+
+    costo_material_principal = df_costeo[df_costeo["Categoría"] == "Material Principal"]["Total c/IVA ($)"].sum()
+    costo_consumibles = df_costeo[df_costeo["Categoría"] == "Consumible"]["Total c/IVA ($)"].sum()
+    costo_total_general = df_costeo["Total c/IVA ($)"].sum()
+    costo_unitario_pza = costo_total_general / meta_costeo if meta_costeo > 0 else 0
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Material Principal (c/IVA)", f"${costo_material_principal:,.2f}")
+    k2.metric("Consumibles (c/IVA)", f"${costo_consumibles:,.2f}")
+    k3.metric("Inversión Total Compra", f"${costo_total_general:,.2f}")
+    k4.metric("Costo Directo / Pieza", f"${costo_unitario_pza:,.2f}")
+
+    st.markdown("---")
+    st.markdown("#### 📋 Lista de Requerimiento para Compras")
+    st.dataframe(
+        df_costeo,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Consumo Exacto": st.column_config.NumberColumn("Consumo Teórico", format="%.2f"),
+            "Cantidad a Comprar (Enteros)": st.column_config.NumberColumn("A Comprar (Cerrado)", format="%d u."),
+            "P.U. c/IVA ($)": st.column_config.NumberColumn("P.U. c/IVA", format="$%.2f"),
+            "Total c/IVA ($)": st.column_config.NumberColumn("Subtotal c/IVA", format="$%,.2f"),
+        }
+    )
+
+    excel_buffer = generar_excel_costeo(df_costeo, meta_costeo, oc_actual, proveedor_sel)
+    st.download_button(
+        label="📥 Descargar Requerimiento y Costeo en Excel (.xlsx)",
+        data=excel_buffer,
+        file_name=f"Costeo_Materiales_{oc_actual}_{meta_costeo}pzas.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        type="primary",
+        use_container_width=True
+    )
+
+elif menu_seleccionado == "📄 Generador de Remisiones":
+    st.subheader("Generador de Remisiones Oficiales - Formato Original Crealag")
+    df_oc_rem = df[df["orden_compra"] == oc_actual] if not df.empty else pd.DataFrame()
+    piezas_producidas_total = df_oc_rem["piezas_producidas"].sum() if not df_oc_rem.empty else 0
+    piezas_almacen_rem = max(0, piezas_producidas_total - entregadas_actual)
+    
+    st.info(f"📦 **Estado de Almacén para `{oc_actual}`:** Total Producido: **{piezas_producidas_total} pzas** | Ya Entregadas: **{entregadas_actual} pzas** | Disponibles: **{piezas_almacen_rem} pzas**")
+
+    with st.form("form_remision"):
+        col1, col2 = st.columns(2)
+        with col1:
+            atencion = st.text_input("Atención", "Ing. Laura Zamora")
+            compania = st.text_input("Compañía", "Herwong")
+            puesto = st.text_input("Puesto", "Compras")
+            email = st.text_input("Email", "compras.herwong@gmail.com")
+            cel = st.text_input("Cel", "871-1442234")
+        with col2:
+            referencia = st.text_input("Referencia", "Respaldos sillas modelo Suiza")
+            fecha_remision = st.date_input("Fecha de emisión", datetime.now())
+            
+            max_val_permitido = max(1, int(piezas_almacen_rem))
+            cantidad_piezas_entrega = st.number_input(
+                "Cantidad de piezas a entregar en esta remisión", 
+                min_value=1, 
+                max_value=max_val_permitido,
+                value=max_val_permitido
+            )
+
+        sumar_a_entregadas = st.checkbox(" Descontar estas piezas de Almacén al generar remisión", value=True)
+        submit_pdf = st.form_submit_button("Generar PDF de Remisión Original", type="primary")
+
+    if submit_pdf:
+        if piezas_almacen_rem <= 0:
+            st.error("❌ No hay piezas disponibles en almacén para remitir en esta Orden de Compra.")
+        elif cantidad_piezas_entrega > piezas_almacen_rem:
+            st.error(f"❌ No puedes remitir {cantidad_piezas_entrega} piezas. Solo hay {piezas_almacen_rem} piezas disponibles en almacén.")
+        else:
+            if sumar_a_entregadas:
+                registrar_entrega_piezas(oc_actual, cantidad_piezas_entrega)
+            pdf_buffer = generar_pdf_original(atencion, compania, puesto, email, cel, referencia, oc_actual, fecha_remision, cantidad_piezas_entrega)
+            st.success(f"¡Remisión por {cantidad_piezas_entrega} piezas generada con éxito y descontada del almacén!")
+            st.download_button(label="📥 Descargar Remisión en PDF", data=pdf_buffer, file_name="Remision.pdf", mime="application/pdf")
