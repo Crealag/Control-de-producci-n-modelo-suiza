@@ -334,4 +334,25 @@ with st.sidebar:
                     st.rerun()
 
 # --- VISTA PRINCIPAL ---
-st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 2
+st.markdown("<h1 class='brand-title'>crealag <span style='font-weight: 300; font-size: 24px; color: #94A3B8;'>| Control de Producción y Remisiones</span></h1>", unsafe_allow_html=True)
+st.markdown("---")
+
+if menu_seleccionado == "📊 Producción y Registro":
+    df_oc = df[df["orden_compra"] == oc_actual] if not df.empty else pd.DataFrame()
+    piezas_producidas_oc = df_oc["piezas_producidas"].sum() if not df_oc.empty else 0
+    piezas_almacen_actual = max(0, piezas_producidas_oc - entregadas_actual)
+    porcentaje = min(1.0, piezas_producidas_oc / meta_actual) if meta_actual > 0 else 0.0
+
+    if piezas_producidas_oc >= meta_actual and estado_oc == "Activa":
+        actualizar_oc_supabase(oc_actual, meta_actual, "Cerrada", entregadas_actual)
+        estado_oc = "Cerrada"
+
+    st.subheader(f"Panel de Control - Orden Activa: {oc_actual} ({estado_oc})")
+    
+    with st.expander(f"⚙️ Configurar / Ajustar Orden {oc_actual}"):
+        with st.form("form_edit_oc"):
+            st.markdown("#### Ajustar Datos de la Orden")
+            col_m1, col_m2, col_m3 = st.columns(3)
+            meta_editada = col_m1.number_input("Meta de piezas:", min_value=1, value=meta_actual, step=10)
+            entregadas_editadas = col_m2.number_input("Piezas Entregadas:", min_value=0, value=entregadas_actual, step=1)
+            estado_editado = col_m3.selectbox("Estado de la OC:", ["Activa", "Cerrada"], index=
