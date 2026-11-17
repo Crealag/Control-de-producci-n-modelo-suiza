@@ -355,4 +355,55 @@ if menu_seleccionado == "📊 Producción y Registro":
             col_m1, col_m2, col_m3 = st.columns(3)
             meta_editada = col_m1.number_input("Meta de piezas:", min_value=1, value=meta_actual, step=10)
             entregadas_editadas = col_m2.number_input("Piezas Entregadas:", min_value=0, value=entregadas_actual, step=1)
-            estado_editado = col_m3.selectbox("Estado de la OC:", ["Activa", "Cerrada"], index=
+            estado_editado = col_m3.selectbox("Estado de la OC:", ["Activa", "Cerrada"], index=0 if estado_oc == "Activa" else 1)
+            
+            btn_guardar_oc = st.form_submit_button("💾 Guardar Cambios en OC", type="primary")
+            if btn_guardar_oc:
+                if actualizar_oc_supabase(oc_actual, meta_editada, estado_editado, entregadas_editadas):
+                    st.success(f"✅ OC {oc_actual} actualizada correctamente.")
+                    st.rerun()
+
+        st.markdown("---")
+        st.markdown("#### 🗑️ Zona de Peligro")
+        if st.button("⚠️ Eliminar esta Orden de Compra por Completo", key="btn_del_oc_main"):
+            if len(lista_ocs) > 1:
+                if eliminar_oc_supabase(oc_actual):
+                    st.success(f"🗑️ OC {oc_actual} eliminada por completo.")
+                    st.rerun()
+            else:
+                st.error("No puedes eliminar la última Orden de Compra registrada.")
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Meta Estimada OC", f"{meta_actual} pzas")
+    m2.metric("Producido Total", f"{piezas_producidas_oc} pzas")
+    m3.metric("Entregadas / Remitidas", f"{entregadas_actual} pzas")
+    m4.metric("Disponibles en Almacén", f"{piezas_almacen_actual} pzas")
+    st.progress(porcentaje)
+
+    st.markdown("---")
+
+    if estado_oc != "Cerrada":
+        st.subheader("➕ Registrar Piezas Producidas")
+        piezas_restantes = max(0, meta_actual - piezas_producidas_oc)
+        
+        if piezas_restantes == 0:
+            st.success(f"🎉 ¡La Orden `{oc_actual}` ya ha completado el 100% de su meta de producción ({meta_actual} pzas)!")
+        else:
+            with st.form("form_registro_produccion"):
+                col_p1, col_p2 = st.columns([1, 2])
+                with col_p1:
+                    cantidad_piezas_in = st.number_input(
+                        "Cantidad de Piezas:", 
+                        min_value=1, 
+                        max_value=int(piezas_restantes), 
+                        value=min(10, int(piezas_restantes)), 
+                        step=1
+                    )
+                with col_p2:
+                    obs_in = st.text_input("Observaciones del Turno:", placeholder="Ej. Avance turno mañana...")
+                
+                col_d1, col_d2 = st.columns(2)
+                fecha_in = col_d1.date_input("Fecha de Registro:", value=date.today())
+                hora_in = col_d2.time_input("Hora de Registro:", value=datetime.now().time())
+                
+                btn_registrar = st.form_submit_button("⚡ Registrar Piezas Producidas", type="primary", use
