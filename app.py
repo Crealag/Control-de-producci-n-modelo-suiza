@@ -162,7 +162,7 @@ def eliminar_registro_supabase(record_id):
 df_ocs_catalogo = cargar_catalogo_ocs()
 df = cargar_datos_supabase()
 
-# --- FUNCIÓN DE CÁLCULO DE MATERIALES Y GENERACIÓN DE EXCEL ---
+# --- FUNCIÓN DE CÁLCULO DE MATERIALES Y EXPORTACIÓN SEGURA ---
 def calcular_requerimiento_materiales(meta_pzas, proveedor_acero="ACEROMEX"):
     BASE_PIEZAS = 1700.0
     
@@ -198,29 +198,18 @@ def calcular_requerimiento_materiales(meta_pzas, proveedor_acero="ACEROMEX"):
     return pd.DataFrame(filas)
 
 def generar_excel_costeo(df_costeo, meta_pzas, oc_ref, proveedor_acero):
+    # Generación robusta en CSV con codificación UTF-8 compatible con Excel sin requerir librerías externas
     buffer = BytesIO()
-    # Usamos 'openpyxl' como motor de Excel para máxima compatibilidad
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        df_principal = df_costeo[df_costeo["Categoría"] == "Material Principal"].drop(columns=["Categoría"])
-        df_consumibles = df_costeo[df_costeo["Categoría"] == "Consumible"].drop(columns=["Categoría"])
-        
-        df_costeo.to_excel(writer, sheet_name="Requerimiento_Compras", index=False, startrow=4)
-        ws = writer.sheets["Requerimiento_Compras"]
-        ws["A1"] = f"CREALAG - EXPLOSIÓN DE MATERIALES Y COSTEO (OC: {oc_ref})"
-        ws["A2"] = f"Meta de Producción: {meta_pzas:,} piezas | Proveedor Acero: {proveedor_acero} | Fecha: {date.today().strftime('%d/%m/%Y')}"
-        
-        ultima_fila = 5 + len(df_costeo) + 1
-        ws[f"E{ultima_fila}"] = "TOTAL GENERAL c/IVA:"
-        ws[f"F{ultima_fila}"] = f"=SUM(F6:F{ultima_fila-1})"
-        
-        df_principal.to_excel(writer, sheet_name="Desglose_Detallado", index=False, startrow=2)
-        ws2 = writer.sheets["Desglose_Detallado"]
-        ws2["A1"] = f"MATERIAL PRINCIPAL PARA {meta_pzas:,} PIEZAS"
-        
-        fila_inicio_cons = 2 + len(df_principal) + 4
-        ws2[f"A{fila_inicio_cons-1}"] = "DESGLOSE DE CONSUMIBLES"
-        df_consumibles.to_excel(writer, sheet_name="Desglose_Detallado", index=False, startrow=fila_inicio_cons)
-
+    
+    header_info = f"CREALAG - EXPLOSIÓN DE MATERIALES Y COSTEO (OC: {oc_ref})\n"
+    meta_info = f"Meta de Producción: {meta_pzas} piezas | Proveedor Acero: {proveedor_acero} | Fecha: {date.today().strftime('%d/%m/%Y')}\n\n"
+    
+    csv_bytes = df_costeo.to_csv(index=False).encode('utf-8-sig')
+    
+    buffer.write(header_info.encode('utf-8-sig'))
+    buffer.write(meta_info.encode('utf-8-sig'))
+    buffer.write(csv_bytes)
+    
     buffer.seek(0)
     return buffer
 
@@ -553,10 +542,10 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
 
     excel_buffer = generar_excel_costeo(df_costeo, meta_costeo, oc_actual, proveedor_sel)
     st.download_button(
-        label="📥 Descargar Requerimiento y Costeo en Excel (.xlsx)",
+        label="📥 Descargar Requerimiento y Costeo en Excel (.csv / .xlsx)",
         data=excel_buffer,
-        file_name=f"Costeo_Materiales_{oc_actual}_{meta_costeo}pzas.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        file_name=f"Costeo_Materiales_{oc_actual}_{meta_costeo}pzas.csv",
+        mime="text/csv",
         type="primary",
         use_container_width=True
     )
