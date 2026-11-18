@@ -493,11 +493,10 @@ if menu_seleccionado == "📊 Producción y Registro":
 
 elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
     st.subheader(f"💰 Explosión de Materiales y Costeo de Compra — Ref: {oc_actual}")
-    st.caption(f"Cálculo automático de insumos basado en la Orden Activa **{oc_actual}** (Meta: **{meta_actual:,} pzas** a partir de la corrida estándar de 1,700 pzas). Puedes editar precios, cantidades o agregar filas libremente.")
+    st.caption(f"Cálculo automático de insumos basado en la Orden Activa **{oc_actual}** (Meta fija: **{meta_actual:,} pzas**). Puedes editar precios, cantidades o agregar filas libremente.")
 
     col_c1, col_c2 = st.columns([1, 1])
     with col_c1:
-        # AQUÍ CAMBIAMOS EL INPUT NUMÉRICO POR UNA TARJETA/CAMPO DE SOLO LECTURA CON LA META FIJA DE LA OC
         meta_costeo = meta_actual
         st.metric(label="Meta de Piezas (Orden Activa)", value=f"{meta_costeo:,} pzas")
     with col_c2:
@@ -506,19 +505,19 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
             ["ACEROMEX", "VENTACERO"]
         )
 
-    # Inicializar datos base proporcionales a la meta de la OC activa
+    # 1. TABLA GENERAL DE COSTEO POR ORDEN
     df_base = calcular_requerimiento_materiales(meta_costeo, proveedor_sel)
 
     st.markdown("---")
-    st.markdown("#### 📋 Lista Interactiva de Requerimiento para Compras")
-    st.info("💡 **Consejo:** Haz doble clic en cualquier celda para editar textos, cambiar precios (`P.U. c/IVA`) o cantidades. Usa el botón `+` en la esquina de la tabla para agregar nuevos materiales o el icono de papelera para borrarlos.")
+    st.markdown("#### 📋 Lista Interactiva de Requerimiento para Compras (Total Orden)")
+    st.info("💡 **Consejo:** Haz doble clic en cualquier celda para editar textos, cambiar precios (`P.U. c/IVA`) o cantidades. Usa el botón `+` para agregar nuevos materiales o la papelera para borrarlos.")
 
-    # TABLA EDITABLE INTERACTIVA
     df_editado = st.data_editor(
         df_base,
         num_rows="dynamic",
         use_container_width=True,
         hide_index=True,
+        key="editor_costeo_general",
         column_config={
             "Categoría": st.column_config.SelectboxColumn("Categoría", options=["Material Principal", "Consumible", "Herramental", "Otro"], required=True),
             "Concepto": st.column_config.TextColumn("Concepto / Material", required=True),
@@ -530,7 +529,6 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
         }
     )
 
-    # Recalcular automáticamente subtotales y métricas en base a lo editado
     df_editado["Subtotal c/IVA ($)"] = df_editado["A Comprar (Cerrado)"] * df_editado["P.U. c/IVA ($)"]
 
     costo_material_principal = df_editado[df_editado["Categoría"] == "Material Principal"]["Subtotal c/IVA ($)"].sum()
@@ -547,16 +545,67 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
 
     st.markdown("---")
 
-    # Exportar con los datos modificados por el usuario
-    excel_buffer = generar_excel_costeo(df_editado, meta_costeo, oc_actual, proveedor_sel)
-    st.download_button(
-        label="📥 Descargar Requerimiento y Costeo Actualizado (.csv)",
-        data=excel_buffer,
-        file_name=f"Costeo_Materiales_{oc_actual}_{meta_costeo}pzas.csv",
-        mime="text/csv",
-        type="primary",
-        use_container_width=True
+    # 2. SECCIÓN NUEVA: PLAN DE COMPRAS SEMANAL BASADO EN RITMO DE PRODUCCIÓN
+    st.markdown("### 🗓️ Plan de Compras Semanal (Ritmo de Producción)")
+    st.caption("Calcula automáticamente qué debes comprar a la semana basándote en tu producción diaria (ej. 110 pzas/día).")
+
+    col_s1, col_s2 = st.columns([1, 1])
+    with col_s1:
+        piezas_diarias = st.number_input("Producción Diaria Estimada (pzas/día):", min_value=1, value=110, step=5)
+    with col_s2:
+        dias_semana = st.number_input("Días Laborales por Semana:", min_value=1, max_value=7, value=6, step=1)
+
+    meta_semanal = piezas_diarias * dias_semana
+    st.info(f"📅 Producción semanal objetivo: **{meta_semanal:,} piezas** ({piezas_diarias} pzas/día × {dias_semana} días).")
+
+    # Calcular requerimientos semanales proporcionales a la corrida base de 1,700 piezas
+    df_semanal_base = calcular_requerimiento_materiales(meta_semanal, proveedor_sel)
+
+    df_semanal_editado = st.data_editor(
+        df_semanal_base,
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        key="editor_compras_semanal",
+        column_config={
+            "Categoría": st.column_config.SelectboxColumn("Categoría", options=["Material Principal", "Consumible", "Herramental", "Otro"], required=True),
+            "Concepto": st.column_config.TextColumn("Concepto / Material", required=True),
+            "Consumo Teórico": st.column_config.NumberColumn("Consumo Teórico", format="%.2f"),
+            "A Comprar (Cerrado)": st.column_config.NumberColumn("A Comprar Semanal", format="%d u.", min_value=0, step=1, required=True),
+            "P.U. c/IVA ($)": st.column_config.NumberColumn("P.U. c/IVA ($)", format="$%.2f", min_value=0.0, step=0.5, required=True),
+            "Subtotal c/IVA ($)": st.column_config.NumberColumn("Subtotal Semanal ($)", format="$%,.2f"),
+            "Proveedor": st.column_config.TextColumn("Proveedor")
+        }
     )
+
+    df_semanal_editado["Subtotal c/IVA ($)"] = df_semanal_editado["A Comprar (Cerrado)"] * df_semanal_editado["P.U. c/IVA ($)"]
+    gasto_total_semanal = df_semanal_editado["Subtotal c/IVA ($)"].sum()
+
+    st.markdown(f"**💰 Inversión Total Estimada para Compras de la Semana:** `⚡ ${gasto_total_semanal:,.2f}`")
+
+    st.markdown("---")
+
+    # Botones de descarga para ambas opciones
+    col_d_btn1, col_d_btn2 = st.columns(2)
+    with col_d_btn1:
+        excel_buffer_general = generar_excel_costeo(df_editado, meta_costeo, oc_actual, proveedor_sel)
+        st.download_button(
+            label="📥 Descargar Costeo Total de OC (.csv)",
+            data=excel_buffer_general,
+            file_name=f"Costeo_General_{oc_actual}_{meta_costeo}pzas.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    with col_d_btn2:
+        excel_buffer_semanal = generar_excel_costeo(df_semanal_editado, meta_semanal, f"SEMANAL-{oc_actual}", proveedor_sel)
+        st.download_button(
+            label="📥 Descargar Plan de Compras Semanal (.csv)",
+            data=excel_buffer_semanal,
+            file_name=f"Plan_Compras_Semanal_{meta_semanal}pzas.csv",
+            mime="text/csv",
+            type="primary",
+            use_container_width=True
+        )
 
 elif menu_seleccionado == "📄 Generador de Remisiones":
     st.subheader("Generador de Remisiones Oficiales - Formato Original Crealag")
