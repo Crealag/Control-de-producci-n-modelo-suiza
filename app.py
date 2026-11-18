@@ -189,18 +189,16 @@ def calcular_requerimiento_materiales(meta_pzas, proveedor_acero="ACEROMEX"):
         filas.append({
             "Categoría": it["Categoría"],
             "Concepto": it["Concepto"],
-            "Consumo Exacto": round(exacto, 2),
-            "Cantidad a Comprar (Enteros)": int(a_comprar),
-            "P.U. c/IVA ($)": it["PU_cIVA"],
-            "Total c/IVA ($)": total,
+            "Consumo Teórico": round(exacto, 2),
+            "A Comprar (Cerrado)": int(a_comprar),
+            "P.U. c/IVA ($)": float(it["PU_cIVA"]),
+            "Subtotal c/IVA ($)": float(total),
             "Proveedor": it["Proveedor"]
         })
     return pd.DataFrame(filas)
 
 def generar_excel_costeo(df_costeo, meta_pzas, oc_ref, proveedor_acero):
-    # Generación robusta en CSV con codificación UTF-8 compatible con Excel sin requerir librerías externas
     buffer = BytesIO()
-    
     header_info = f"CREALAG - EXPLOSIÓN DE MATERIALES Y COSTEO (OC: {oc_ref})\n"
     meta_info = f"Meta de Producción: {meta_pzas} piezas | Proveedor Acero: {proveedor_acero} | Fecha: {date.today().strftime('%d/%m/%Y')}\n\n"
     
@@ -495,7 +493,7 @@ if menu_seleccionado == "📊 Producción y Registro":
 
 elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
     st.subheader(f"💰 Explosión de Materiales y Costeo de Compra — Ref: {oc_actual}")
-    st.caption("Calcula automáticamente la cantidad exacta de acero y consumibles a comprar (redondeado a unidades enteras de compra) con base en la corrida estándar de Respaldos Silla Roma.")
+    st.caption("Calcula automáticamente los insumos. Puedes editar precios unitarios, cambiar cantidades o **agregar/eliminar filas** directamente en la tabla inferior.")
 
     col_c1, col_c2 = st.columns([1, 1])
     with col_c1:
@@ -512,37 +510,52 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
             ["ACEROMEX", "VENTACERO"]
         )
 
-    df_costeo = calcular_requerimiento_materiales(meta_costeo, proveedor_sel)
+    # Inicializar datos base
+    df_base = calcular_requerimiento_materiales(meta_costeo, proveedor_sel)
 
-    costo_material_principal = df_costeo[df_costeo["Categoría"] == "Material Principal"]["Total c/IVA ($)"].sum()
-    costo_consumibles = df_costeo[df_costeo["Categoría"] == "Consumible"]["Total c/IVA ($)"].sum()
-    costo_total_general = df_costeo["Total c/IVA ($)"].sum()
+    st.markdown("---")
+    st.markdown("#### 📋 Lista Interactiva de Requerimiento para Compras")
+    st.info("💡 **Consejo:** Haz doble clic en cualquier celda para editar textos, cambiar precios o cantidades (`P.U. c/IVA`). Usa el botón `+` en la esquina de la tabla para agregar nuevos materiales o el icono de papelera para borrarlos.")
+
+    # TABLA EDITABLE INTERACTIVA
+    df_editado = st.data_editor(
+        df_base,
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Categoría": st.column_config.SelectboxColumn("Categoría", options=["Material Principal", "Consumible", "Herramental", "Otro"], required=True),
+            "Concepto": st.column_config.TextColumn("Concepto / Material", required=True),
+            "Consumo Teórico": st.column_config.NumberColumn("Consumo Teórico", format="%.2f"),
+            "A Comprar (Cerrado)": st.column_config.NumberColumn("A Comprar (Cerrado)", format="%d u.", min_value=0, step=1, required=True),
+            "P.U. c/IVA ($)": st.column_config.NumberColumn("P.U. c/IVA ($)", format="$%.2f", min_value=0.0, step=0.5, required=True),
+            "Subtotal c/IVA ($)": st.column_config.NumberColumn("Subtotal c/IVA ($)", format="$%,.2f"),
+            "Proveedor": st.column_config.TextColumn("Proveedor")
+        }
+    )
+
+    # Recalcular automáticamente los subtotales y métricas en base a lo que el usuario editó
+    df_editado["Subtotal c/IVA ($)"] = df_editado["A Comprar (Cerrado)"] * df_editado["P.U. c/IVA ($)"]
+
+    # Filtrar subtotales por categoría de manera dinámica
+    costo_material_principal = df_editado[df_editado["Categoría"] == "Material Principal"]["Subtotal c/IVA ($)"].sum()
+    costo_consumibles = df_editado[df_editado["Categoría"].isin(["Consumible", "Herramental", "Otro"])]["Subtotal c/IVA ($)"].sum()
+    costo_total_general = df_editado["Subtotal c/IVA ($)"].sum()
     costo_unitario_pza = costo_total_general / meta_costeo if meta_costeo > 0 else 0
 
     st.markdown("<br>", unsafe_allow_html=True)
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Material Principal (c/IVA)", f"${costo_material_principal:,.2f}")
-    k2.metric("Consumibles (c/IVA)", f"${costo_consumibles:,.2f}")
+    k2.metric("Consumibles / Otros (c/IVA)", f"${costo_consumibles:,.2f}")
     k3.metric("Inversión Total Compra", f"${costo_total_general:,.2f}")
     k4.metric("Costo Directo / Pieza", f"${costo_unitario_pza:,.2f}")
 
     st.markdown("---")
-    st.markdown("#### 📋 Lista de Requerimiento para Compras")
-    st.dataframe(
-        df_costeo,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Consumo Exacto": st.column_config.NumberColumn("Consumo Teórico", format="%.2f"),
-            "Cantidad a Comprar (Enteros)": st.column_config.NumberColumn("A Comprar (Cerrado)", format="%d u."),
-            "P.U. c/IVA ($)": st.column_config.NumberColumn("P.U. c/IVA", format="$%.2f"),
-            "Total c/IVA ($)": st.column_config.NumberColumn("Subtotal c/IVA", format="$%,.2f"),
-        }
-    )
 
-    excel_buffer = generar_excel_costeo(df_costeo, meta_costeo, oc_actual, proveedor_sel)
+    # Exportar con los datos modificados por el usuario
+    excel_buffer = generar_excel_costeo(df_editado, meta_costeo, oc_actual, proveedor_sel)
     st.download_button(
-        label="📥 Descargar Requerimiento y Costeo en Excel (.csv / .xlsx)",
+        label="📥 Descargar Requerimiento y Costeo Actualizado (.csv)",
         data=excel_buffer,
         file_name=f"Costeo_Materiales_{oc_actual}_{meta_costeo}pzas.csv",
         mime="text/csv",
