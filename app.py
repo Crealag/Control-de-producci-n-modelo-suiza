@@ -199,25 +199,26 @@ def calcular_requerimiento_materiales(meta_pzas, proveedor_acero="ACEROMEX"):
 
 def generar_excel_costeo(df_costeo, meta_pzas, oc_ref, proveedor_acero):
     buffer = BytesIO()
-    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+    # Usamos 'openpyxl' como motor de Excel para máxima compatibilidad
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         df_principal = df_costeo[df_costeo["Categoría"] == "Material Principal"].drop(columns=["Categoría"])
         df_consumibles = df_costeo[df_costeo["Categoría"] == "Consumible"].drop(columns=["Categoría"])
         
         df_costeo.to_excel(writer, sheet_name="Requerimiento_Compras", index=False, startrow=4)
         ws = writer.sheets["Requerimiento_Compras"]
-        ws.write("A1", f"CREALAG - EXPLOSIÓN DE MATERIALES Y COSTEO (OC: {oc_ref})")
-        ws.write("A2", f"Meta de Producción: {meta_pzas:,} piezas | Proveedor Acero: {proveedor_acero} | Fecha: {date.today().strftime('%d/%m/%Y')}")
+        ws["A1"] = f"CREALAG - EXPLOSIÓN DE MATERIALES Y COSTEO (OC: {oc_ref})"
+        ws["A2"] = f"Meta de Producción: {meta_pzas:,} piezas | Proveedor Acero: {proveedor_acero} | Fecha: {date.today().strftime('%d/%m/%Y')}"
         
         ultima_fila = 5 + len(df_costeo) + 1
-        ws.write(f"E{ultima_fila}", "TOTAL GENERAL c/IVA:")
-        ws.write_formula(f"F{ultima_fila}", f"=SUM(F6:F{ultima_fila-1})")
+        ws[f"E{ultima_fila}"] = "TOTAL GENERAL c/IVA:"
+        ws[f"F{ultima_fila}"] = f"=SUM(F6:F{ultima_fila-1})"
         
         df_principal.to_excel(writer, sheet_name="Desglose_Detallado", index=False, startrow=2)
         ws2 = writer.sheets["Desglose_Detallado"]
-        ws2.write("A1", f"MATERIAL PRINCIPAL PARA {meta_pzas:,} PIEZAS")
+        ws2["A1"] = f"MATERIAL PRINCIPAL PARA {meta_pzas:,} PIEZAS"
         
         fila_inicio_cons = 2 + len(df_principal) + 4
-        ws2.write(f"A{fila_inicio_cons-1}", "DESGLOSE DE CONSUMIBLES")
+        ws2[f"A{fila_inicio_cons-1}"] = "DESGLOSE DE CONSUMIBLES"
         df_consumibles.to_excel(writer, sheet_name="Desglose_Detallado", index=False, startrow=fila_inicio_cons)
 
     buffer.seek(0)
@@ -383,7 +384,6 @@ if menu_seleccionado == "📊 Producción y Registro":
     st.markdown("---")
 
     if estado_oc != "Cerrada":
-        # Bloque 1: Registrar Producción Normal
         st.subheader("➕ Registrar Piezas Producidas")
         piezas_restantes = max(0, meta_actual - piezas_producidas_oc)
         
@@ -420,7 +420,6 @@ if menu_seleccionado == "📊 Producción y Registro":
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Bloque 2: Formulario Independiente para Registrar Paros o Incidencias
         st.subheader("⚠️ Registrar Paro o Incidencia en Línea")
         with st.form("form_registro_paro"):
             col_paro1, col_paro2 = st.columns(2)
