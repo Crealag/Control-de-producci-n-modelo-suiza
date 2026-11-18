@@ -167,8 +167,43 @@ def eliminar_registro_supabase(record_id):
     except Exception as e:
         st.error(f"Error al eliminar registro: {e}")
 
+# Funciones para Historial de Compras de Insumos en Supabase
+def cargar_historial_compras():
+    if not supabase:
+        return pd.DataFrame(columns=["id", "fecha", "operacion", "material", "cantidad", "proveedor", "costo_total", "observaciones"])
+    try:
+        res = supabase.table("Historial_Compras_Insumos").select("*").order("fecha", desc=True).execute()
+        return pd.DataFrame(res.data) if res.data else pd.DataFrame(columns=["id", "fecha", "operacion", "material", "cantidad", "proveedor", "costo_total", "observaciones"])
+    except Exception:
+        return pd.DataFrame(columns=["id", "fecha", "operacion", "material", "cantidad", "proveedor", "costo_total", "observaciones"])
+
+def registrar_compra_insumo(fecha, operacion, material, cantidad, proveedor, costo_total, observaciones):
+    if not supabase: return False
+    try:
+        supabase.table("Historial_Compras_Insumos").insert({
+            "fecha": fecha,
+            "operacion": operacion,
+            "material": material,
+            "cantidad": float(cantidad),
+            "proveedor": proveedor,
+            "costo_total": float(costo_total),
+            "observaciones": observaciones
+        }).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error al guardar compra de insumo: {e}")
+        return False
+
+def eliminar_compra_insumo(record_id):
+    if not supabase: return
+    try:
+        supabase.table("Historial_Compras_Insumos").delete().eq("id", record_id).execute()
+    except Exception as e:
+        st.error(f"Error al eliminar registro de compra: {e}")
+
 df_ocs_catalogo = cargar_catalogo_ocs()
 df = cargar_datos_supabase()
+df_compras = cargar_historial_compras()
 
 # --- FUNCIÓN DE CÁLCULO DE MATERIALES (Base 1,700 pzas) Y EXPORTACIÓN ---
 def calcular_requerimiento_materiales(meta_pzas, proveedor_acero="ACEROMEX"):
@@ -501,18 +536,18 @@ if menu_seleccionado == "📊 Producción y Registro":
 
 elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
     st.subheader(f"💰 Explosión de Materiales y Costeo — Ref: {oc_actual}")
-    st.markdown("Selecciona el modo de visualización para planificar tus compras de manera limpia y ordenada.")
+    st.markdown("Organiza tus compras por orden, planifica por ritmo semanal o registra las fechas exactas de tus recargas de gas y soldadura por operación.")
 
     # --- SELECTOR DE VISTA ESTILO PESTAÑA LIMPIA ---
     modo_vista = st.radio(
-        "Modo de Planificación de Compras:",
-        ["📦 Costeo Total de la Orden Activa", "🗓️ Plan de Compras Semanal (Ritmo de Producción)"],
+        "Modo de Planificación:",
+        ["📦 Costeo Total Orden Activa", "🗓️ Plan de Compras Semanal", "🛠️ Historial de Compras y Consumos (Gas/Varilla/Soldadura)"],
         horizontal=True,
         label_visibility="collapsed"
     )
     st.markdown("---")
 
-    if modo_vista == "📦 Costeo Total de la Orden Activa":
+    if modo_vista == "📦 Costeo Total Orden Activa":
         col_c1, col_c2 = st.columns([1, 1])
         with col_c1:
             meta_costeo = meta_actual
@@ -571,7 +606,7 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
             use_container_width=True
         )
 
-    else:
+    elif modo_vista == "🗓️ Plan de Compras Semanal":
         col_s1, col_s2, col_s3 = st.columns(3)
         with col_s1:
             piezas_diarias = st.number_input("Producción Diaria (pzas/día):", min_value=1, value=110, step=5)
@@ -625,6 +660,66 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
             type="primary",
             use_container_width=True
         )
+
+    else:
+        st.markdown("#### 🛠️ Registro de Compras y Control de Consumibles (Gas / Varilla / Soldadura)")
+        st.caption("Registra aquí cada vez que compres varilla, cambies tanque de gas o abras soldadura nueva diferenciando por operación/línea para llevar el rastro exacto de cuándo se consumen.")
+
+        with st.form("form_reg_compra_insumo"):
+            c_i1, c_i2, c_i3 = st.columns(3)
+            fecha_compra = c_i1.date_input("Fecha de Compra / Cambio:", value=date.today())
+            operacion_sel = c_i2.selectbox("Operación / Línea:", ["Operación 1", "Operación 2", "General / Ambas"])
+            material_sel = c_i3.selectbox("Insumo / Material:", [
+                'Semiflecha 1/4"', 
+                'Solera 1/8" x 1/2"', 
+                "Gas CO2 25 Kg (Tanque Nuevo/Recarga)", 
+                "Soldadura 5 Kg", 
+                "Disco de corte 4 1/2\"", 
+                "Disco de lija", 
+                "Otro"
+            ])
+
+            c_i4, c_i5, c_i6 = st.columns(3)
+            cantidad_insumo = c_i4.number_input("Cantidad Comprada / Cambiada:", min_value=0.1, value=1.0, step=1.0)
+            proveedor_insumo = c_i5.text_input("Proveedor:", value="ACEROMEX / PROVEEDOR")
+            costo_insumo = c_i6.number_input("Costo Total c/IVA ($):", min_value=0.0, value=0.0, step=50.0)
+
+            obs_insumo = st.text_input("Observaciones / Lote / Razón:", placeholder="Ej. Cambio de tanque en línea 2 por agotamiento...")
+
+            btn_guardar_insumo = st.form_submit_button("💾 Registrar Compra / Cambio de Insumo", type="primary", use_container_width=True)
+            if btn_guardar_insumo:
+                if registrar_compra_insumo(fecha_compra.strftime("%Y-%m-%d"), operacion_sel, material_sel, cantidad_insumo, proveedor_insumo, costo_insumo, obs_insumo):
+                    st.success("✅ ¡Compra o cambio de insumo registrado con éxito!")
+                    st.rerun()
+
+        st.markdown("---")
+        st.markdown("#### 📜 Historial Registrado de Compras y Consumos")
+        
+        if not df_compras.empty:
+            st.dataframe(
+                df_compras,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "id": st.column_config.NumberColumn("ID", width="small"),
+                    "fecha": st.column_config.TextColumn("Fecha", width="medium"),
+                    "operacion": st.column_config.TextColumn("Operación", width="medium"),
+                    "material": st.column_config.TextColumn("Material / Insumo", width="large"),
+                    "cantidad": st.column_config.NumberColumn("Cantidad", format="%.1f u."),
+                    "proveedor": st.column_config.TextColumn("Proveedor", width="medium"),
+                    "costo_total": st.column_config.NumberColumn("Costo Total", format="$%,.2f"),
+                    "observaciones": st.column_config.TextColumn("Observaciones", width="large"),
+                }
+            )
+
+            with st.expander("🗑️ Eliminar un Registro del Historial"):
+                id_compra_del = st.selectbox("Selecciona ID de compra a eliminar:", df_compras["id"].tolist())
+                if st.button("Borrar Registro Seleccionado"):
+                    eliminar_compra_insumo(id_compra_del)
+                    st.success("Registro eliminado.")
+                    st.rerun()
+        else:
+            st.info("ℹ️ Aún no hay registros de compras de insumos guardados. Usa el formulario de arriba para empezar a registrar cuándo cambias gas, soldadura o compras varilla.")
 
 elif menu_seleccionado == "📄 Generador de Remisiones":
     st.subheader("Generador de Remisiones Oficiales - Formato Original Crealag")
