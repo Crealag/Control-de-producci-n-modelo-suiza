@@ -167,12 +167,12 @@ def eliminar_registro_supabase(record_id):
     except Exception as e:
         st.error(f"Error al eliminar registro: {e}")
 
-# Funciones para Tablas Independientes (Compras vs Cambios de Consumibles por Ciclo)
+# Funciones apuntando a las nuevas tablas en minúsculas
 def cargar_historial_compras():
     if not supabase:
         return pd.DataFrame(columns=["id", "fecha", "material", "cantidad", "proveedor", "costo_total", "observaciones"])
     try:
-        res = supabase.table("Historial_Compras_Materiales").select("*").order("fecha", desc=True).execute()
+        res = supabase.table("historial_compras_materiales").select("*").order("fecha", desc=True).execute()
         return pd.DataFrame(res.data) if res.data else pd.DataFrame(columns=["id", "fecha", "material", "cantidad", "proveedor", "costo_total", "observaciones"])
     except Exception:
         return pd.DataFrame(columns=["id", "fecha", "material", "cantidad", "proveedor", "costo_total", "observaciones"])
@@ -180,7 +180,7 @@ def cargar_historial_compras():
 def registrar_compra_material(fecha, material, cantidad, proveedor, costo_total, observaciones):
     if not supabase: return False
     try:
-        supabase.table("Historial_Compras_Materiales").insert({
+        supabase.table("historial_compras_materiales").insert({
             "fecha": fecha, "material": material, "cantidad": float(cantidad),
             "proveedor": proveedor, "costo_total": float(costo_total), "observaciones": observaciones
         }).execute()
@@ -192,7 +192,7 @@ def registrar_compra_material(fecha, material, cantidad, proveedor, costo_total,
 def eliminar_compra_material(record_id):
     if not supabase: return
     try:
-        supabase.table("Historial_Compras_Materiales").delete().eq("id", record_id).execute()
+        supabase.table("historial_compras_materiales").delete().eq("id", record_id).execute()
     except Exception as e:
         st.error(f"Error al eliminar compra: {e}")
 
@@ -200,7 +200,7 @@ def cargar_historial_cambios():
     if not supabase:
         return pd.DataFrame(columns=["id", "fecha", "operacion", "consumible", "piezas_acumuladas_corte", "piezas_del_ciclo", "observaciones"])
     try:
-        res = supabase.table("Historial_Cambios_Consumibles").select("*").order("fecha", desc=True).execute()
+        res = supabase.table("historial_cambios_consumibles").select("*").order("fecha", desc=True).execute()
         return pd.DataFrame(res.data) if res.data else pd.DataFrame(columns=["id", "fecha", "operacion", "consumible", "piezas_acumuladas_corte", "piezas_del_ciclo", "observaciones"])
     except Exception:
         return pd.DataFrame(columns=["id", "fecha", "operacion", "consumible", "piezas_acumuladas_corte", "piezas_del_ciclo", "observaciones"])
@@ -208,7 +208,7 @@ def cargar_historial_cambios():
 def registrar_cambio_consumible(fecha, operacion, consumible, piezas_corte, piezas_ciclo, observaciones):
     if not supabase: return False
     try:
-        supabase.table("Historial_Cambios_Consumibles").insert({
+        supabase.table("historial_cambios_consumibles").insert({
             "fecha": fecha, 
             "operacion": operacion, 
             "consumible": consumible,
@@ -224,7 +224,7 @@ def registrar_cambio_consumible(fecha, operacion, consumible, piezas_corte, piez
 def eliminar_cambio_consumible(record_id):
     if not supabase: return
     try:
-        supabase.table("Historial_Cambios_Consumibles").delete().eq("id", record_id).execute()
+        supabase.table("historial_cambios_consumibles").delete().eq("id", record_id).execute()
     except Exception as e:
         st.error(f"Error al eliminar cambio: {e}")
 
