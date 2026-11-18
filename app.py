@@ -29,7 +29,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Estilos CSS - Paleta Oscura Neutra con Tabla Estilizada y Amigable
+# Estilos CSS - Diseño Moderno, Limpio y Ejecutivo (Paleta Oscura Crealag)
 css_estilos = """
 <style>
 .stApp { background-color: #0A0F1D; color: #F8FAFC; }
@@ -50,8 +50,16 @@ button:hover, .stButton>button:hover, [data-testid="baseButton-primary"]:hover {
     color: #FFFFFF !important;
 }
 .brand-title { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; color: #F8FAFC; }
-[data-testid="stMetricValue"] { color: #F8FAFC !important; font-weight: 800 !important; }
-[data-testid="stMetricLabel"] { color: #94A3B8 !important; font-weight: 700 !important; }
+[data-testid="stMetricValue"] { color: #38BDF8 !important; font-weight: 800 !important; font-size: 26px !important; }
+[data-testid="stMetricLabel"] { color: #94A3B8 !important; font-weight: 600 !important; font-size: 13px !important; }
+
+/* Tarjetas contenedoras limpias */
+.css-1r6slb0, div.stHorizontalBlock {
+    background-color: #111B2E;
+    border: 1px solid #1E293B;
+    border-radius: 14px;
+    padding: 15px;
+}
 
 /* Estilos amigables y modernos para la tabla de datos */
 [data-testid="stDataFrame"] {
@@ -493,14 +501,18 @@ if menu_seleccionado == "📊 Producción y Registro":
 
 elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
     st.subheader(f"💰 Explosión de Materiales y Costeo — Ref: {oc_actual}")
-    st.caption("Organiza y calcula los requerimientos de insumos por Orden de Compra o por tu Plan de Compras Semanal mediante las pestañas inferiores.")
+    st.markdown("Selecciona el modo de visualización para planificar tus compras de manera limpia y ordenada.")
 
-    # --- ORGANIZACIÓN EN PESTAÑAS (TABS) PARA MEJORAR LA DISTRIBUCIÓN ---
-    tab_general, tab_semanal = st.tabs(["📦 Costeo Total de la Orden", "🗓️ Plan de Compras Semanal"])
+    # --- SELECTOR DE VISTA ESTILO PESTAÑA LIMPIA ---
+    modo_vista = st.radio(
+        "Modo de Planificación de Compras:",
+        ["📦 Costeo Total de la Orden Activa", "🗓️ Plan de Compras Semanal (Ritmo de Producción)"],
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+    st.markdown("---")
 
-    with tab_general:
-        st.markdown(f"#### Costeo General para la Orden Activa: `{oc_actual}` (Meta: **{meta_actual:,} pzas**) oficina estándar")
-        
+    if modo_vista == "📦 Costeo Total de la Orden Activa":
         col_c1, col_c2 = st.columns([1, 1])
         with col_c1:
             meta_costeo = meta_actual
@@ -514,8 +526,8 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
 
         df_base = calcular_requerimiento_materiales(meta_costeo, proveedor_sel)
 
-        st.markdown("---")
-        st.info("💡 **Consejo:** Haz doble clic en cualquier celda para editar textos, cambiar precios (`P.U. c/IVA`) o cantidades. Usa el botón `+` para agregar nuevos materiales o la papelera para borrarlos.")
+        st.markdown("#### 📋 Lista Interactiva de Requerimiento para Compras (Total Orden)")
+        st.caption("💡 **Consejo:** Haz doble clic en cualquier celda para editar textos, cambiar precios (`P.U. c/IVA`) o cantidades. Usa el botón `+` para agregar nuevos materiales o la papelera para borrarlos.")
 
         df_editado = st.data_editor(
             df_base,
@@ -559,9 +571,7 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
             use_container_width=True
         )
 
-    with tab_semanal:
-        st.markdown("#### Plan de Compras por Ritmo de Producción Semanal")
-        
+    else:
         col_s1, col_s2, col_s3 = st.columns(3)
         with col_s1:
             piezas_diarias = st.number_input("Producción Diaria (pzas/día):", min_value=1, value=110, step=5)
@@ -578,6 +588,9 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
         st.info(f"📅 Producción semanal objetivo: **{meta_semanal:,} piezas** ({piezas_diarias} pzas/día × {dias_semana} días).")
 
         df_semanal_base = calcular_requerimiento_materiales(meta_semanal, proveedor_sel_sem)
+
+        st.markdown("#### 📋 Plan de Compras por Ritmo de Producción Semanal")
+        st.caption("💡 Edita precios unitarios o cantidades según tus cotizaciones actuales con proveedores.")
 
         df_semanal_editado = st.data_editor(
             df_semanal_base,
@@ -599,7 +612,8 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
         df_semanal_editado["Subtotal c/IVA ($)"] = df_semanal_editado["A Comprar (Cerrado)"] * df_semanal_editado["P.U. c/IVA ($)"]
         gasto_total_semanal = df_semanal_editado["Subtotal c/IVA ($)"].sum()
 
-        st.markdown(f"**💰 Inversión Total Estimada para Compras de la Semana:** `⚡ ${gasto_total_semanal:,.2f}`")
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.metric(label="Inversión Total Estimada para Compras de la Semana", value=f"${gasto_total_semanal:,.2f}")
 
         st.markdown("---")
         excel_buffer_semanal = generar_excel_costeo(df_semanal_editado, meta_semanal, f"SEMANAL-{oc_actual}", proveedor_sel_sem)
