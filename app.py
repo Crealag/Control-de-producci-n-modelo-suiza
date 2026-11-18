@@ -167,7 +167,7 @@ def eliminar_registro_supabase(record_id):
     except Exception as e:
         st.error(f"Error al eliminar registro: {e}")
 
-# Funciones para Tablas Independientes (Compras vs Cambios de Consumibles)
+# Funciones para Tablas Independientes (Compras vs Cambios de Consumibles por Ciclo)
 def cargar_historial_compras():
     if not supabase:
         return pd.DataFrame(columns=["id", "fecha", "material", "cantidad", "proveedor", "costo_total", "observaciones"])
@@ -198,19 +198,23 @@ def eliminar_compra_material(record_id):
 
 def cargar_historial_cambios():
     if not supabase:
-        return pd.DataFrame(columns=["id", "fecha", "operacion", "consumible", "cantidad", "observaciones"])
+        return pd.DataFrame(columns=["id", "fecha", "operacion", "consumible", "piezas_acumuladas_corte", "piezas_del_ciclo", "observaciones"])
     try:
         res = supabase.table("Historial_Cambios_Consumibles").select("*").order("fecha", desc=True).execute()
-        return pd.DataFrame(res.data) if res.data else pd.DataFrame(columns=["id", "fecha", "operacion", "consumible", "cantidad", "observaciones"])
+        return pd.DataFrame(res.data) if res.data else pd.DataFrame(columns=["id", "fecha", "operacion", "consumible", "piezas_acumuladas_corte", "piezas_del_ciclo", "observaciones"])
     except Exception:
-        return pd.DataFrame(columns=["id", "fecha", "operacion", "consumible", "cantidad", "observaciones"])
+        return pd.DataFrame(columns=["id", "fecha", "operacion", "consumible", "piezas_acumuladas_corte", "piezas_del_ciclo", "observaciones"])
 
-def registrar_cambio_consumible(fecha, operacion, consumible, cantidad, observaciones):
+def registrar_cambio_consumible(fecha, operacion, consumible, piezas_corte, piezas_ciclo, observaciones):
     if not supabase: return False
     try:
         supabase.table("Historial_Cambios_Consumibles").insert({
-            "fecha": fecha, "operacion": operacion, "consumible": consumible,
-            "cantidad": float(cantidad), "observaciones": observaciones
+            "fecha": fecha, 
+            "operacion": operacion, 
+            "consumible": consumible,
+            "piezas_acumuladas_corte": int(piezas_corte),
+            "piezas_del_ciclo": int(piezas_ciclo),
+            "observaciones": observaciones
         }).execute()
         return True
     except Exception as e:
@@ -569,7 +573,7 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
             "📦 Costeo Total Orden Activa", 
             "🗓️ Plan de Compras Semanal", 
             "🛒 Registro de Compras (Varilla / Solera)", 
-            "🔄 Registro de Cambios en Línea (Gas / Soldadura)"
+            "🔄 Control de Cambios y Rendimiento por Ciclo (Gas / Soldadura)"
         ],
         horizontal=True,
         label_visibility="collapsed"
@@ -739,27 +743,41 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
             st.info("ℹ️ Aún no hay compras registradas.")
 
     else:
-        st.markdown("#### 🔄 Control de Cambios en Línea (Gas y Soldadura por Operación)")
-        st.caption("Registra de forma independiente cuándo cambias tanques de gas o abres rollos/cajas de soldadura por línea/operación para controlar su desgaste variable.")
+        st.markdown("#### 🔄 Control de Cambios y Rendimiento por Ciclo (Gas y Soldadura)")
+        st.caption("Registra cuándo se agota un insumo y el sistema calculará automáticamente cuántas piezas exactas rindió en ese ciclo para esa operación.")
 
         with st.form("form_reg_cambio_consumible"):
             c_g1, c_g2, c_g3 = st.columns(3)
-            fecha_cam = c_g1.date_input("Fecha de Cambio:", value=date.today())
+            fecha_cam = c_g1.date_input("Fecha del Cambio:", value=date.today())
             operacion_cam = c_g2.selectbox("Operación / Línea:", ["Operación 1 (Línea 1)", "Operación 2 (Línea 2)"])
             consumible_cam = c_g3.selectbox("Consumible:", ["Gas CO2 25 Kg", "Soldadura 5 Kg", "Otro Consumible"])
 
             c_g4, c_g5 = st.columns(2)
-            cantidad_cam = c_g4.number_input("Cantidad Cambiada / Agotada:", min_value=0.5, value=1.0, step=0.5)
-            obs_cam = c_g5.text_input("Observaciones / Motivo:", placeholder="Ej. Tanque agotado en Línea 2...")
+            piezas_corte = c_g4.number_input(
+                "Piezas acumuladas al momento del cambio:", 
+                min_value=0, 
+                value=100, 
+                step=1,
+                help="Número total de piezas producidas hasta la hora exacta en que se terminó el tanque o la soldadura."
+            )
+            obs_cam = c_g5.text_input("Observaciones / Motivo:", placeholder="Ej. Se terminó a mitad de turno...")
 
-            btn_guardar_cam = st.form_submit_button("💾 Registrar Cambio en Línea", type="primary", use_container_width=True)
+            btn_guardar_cam = st.form_submit_button("⚡ Registrar Cambio y Calcular Rendimiento", type="primary", use_container_width=True)
             if btn_guardar_cam:
-                if registrar_cambio_consumible(fecha_cam.strftime("%Y-%m-%d"), operacion_cam, consumible_cam, cantidad_cam, obs_cam):
-                    st.success("✅ ¡Cambio de consumible registrado con éxito!")
+                # Calcular piezas del ciclo restando el corte anterior para este mismo consumible y operación
+                df_op_cons = df_cambios[(df_cambios["operacion"] == operacion_cam) & (df_cambios["consumible"] == consumible_cam)]
+                if not df_op_cons.empty:
+                    ultima_pieza_anterior = df_op_cons.iloc[0]["piezas_acumuladas_corte"]
+                    piezas_ciclo = max(0, piezas_corte - ultima_pieza_anterior)
+                else:
+                    piezas_ciclo = piezas_corte  # Primer registro para este consumible
+
+                if registrar_cambio_consumible(fecha_cam.strftime("%Y-%m-%d"), operacion_cam, consumible_cam, piezas_corte, piezas_ciclo, obs_cam):
+                    st.success(f"✅ ¡Cambio registrado! Este ciclo rindió **{piezas_ciclo:,} piezas**.")
                     st.rerun()
 
         st.markdown("---")
-        st.markdown("#### 📜 Historial de Cambios en Línea")
+        st.markdown("#### 📜 Historial de Cambios y Rendimiento por Ciclo")
         if not df_cambios.empty:
             st.dataframe(
                 df_cambios,
@@ -770,7 +788,8 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
                     "fecha": st.column_config.TextColumn("Fecha", width="medium"),
                     "operacion": st.column_config.TextColumn("Operación", width="medium"),
                     "consumible": st.column_config.TextColumn("Consumible", width="large"),
-                    "cantidad": st.column_config.NumberColumn("Cantidad", format="%.1f u."),
+                    "piezas_acumuladas_corte": st.column_config.NumberColumn("Pz. Acumuladas Corte", format="%d pzas"),
+                    "piezas_del_ciclo": st.column_config.NumberColumn("⚡ Rendimiento del Ciclo", format="%d pzas"),
                     "observaciones": st.column_config.TextColumn("Observaciones", width="large"),
                 }
             )
@@ -781,7 +800,7 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
                     st.success("Cambio eliminado.")
                     st.rerun()
         else:
-            st.info("ℹ️ Aún no hay registros de cambios de gas o soldadura en línea.")
+            st.info("ℹ️ Aún no hay registros de cambios con rendimiento por ciclo.")
 
 elif menu_seleccionado == "📄 Generador de Remisiones":
     st.subheader("Generador de Remisiones Oficiales - Formato Original Crealag")
