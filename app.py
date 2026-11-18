@@ -162,7 +162,7 @@ def eliminar_registro_supabase(record_id):
 df_ocs_catalogo = cargar_catalogo_ocs()
 df = cargar_datos_supabase()
 
-# --- FUNCIÓN DE CÁLCULO DE MATERIALES Y EXPORTACIÓN SEGURA ---
+# --- FUNCIÓN DE CÁLCULO DE MATERIALES (Base 1,700 pzas) Y EXPORTACIÓN ---
 def calcular_requerimiento_materiales(meta_pzas, proveedor_acero="ACEROMEX"):
     BASE_PIEZAS = 1700.0
     
@@ -493,16 +493,17 @@ if menu_seleccionado == "📊 Producción y Registro":
 
 elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
     st.subheader(f"💰 Explosión de Materiales y Costeo de Compra — Ref: {oc_actual}")
-    st.caption("Calcula automáticamente los insumos. Puedes editar precios unitarios, cambiar cantidades o **agregar/eliminar filas** directamente en la tabla inferior.")
+    st.caption("Calcula automáticamente los insumos a partir de la corrida estándar de 1,700 piezas. Puedes editar precios unitarios, cambiar cantidades o agregar/eliminar filas directamente en la tabla.")
 
     col_c1, col_c2 = st.columns([1, 1])
     with col_c1:
+        # AQUÍ ESTABLECEMOS LA META ACTUAL DE LA OC COMO VALOR POR DEFECTO
         meta_costeo = st.number_input(
             "Meta de Piezas a Cotizar / Producir:", 
             min_value=1, 
             value=meta_actual, 
             step=50,
-            help="Por defecto carga la meta de la OC activa, pero puedes poner cualquier cantidad para simular compras."
+            help="Carga automáticamente la meta de la Orden de Compra activa, pero puedes ajustarla para simulaciones."
         )
     with col_c2:
         proveedor_sel = st.selectbox(
@@ -510,12 +511,12 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
             ["ACEROMEX", "VENTACERO"]
         )
 
-    # Inicializar datos base
+    # Inicializar datos base proporcionales a la meta activa
     df_base = calcular_requerimiento_materiales(meta_costeo, proveedor_sel)
 
     st.markdown("---")
     st.markdown("#### 📋 Lista Interactiva de Requerimiento para Compras")
-    st.info("💡 **Consejo:** Haz doble clic en cualquier celda para editar textos, cambiar precios o cantidades (`P.U. c/IVA`). Usa el botón `+` en la esquina de la tabla para agregar nuevos materiales o el icono de papelera para borrarlos.")
+    st.info("💡 **Consejo:** Haz doble clic en cualquier celda para editar textos, cambiar precios (`P.U. c/IVA`) o cantidades. Usa el botón `+` en la esquina de la tabla para agregar nuevos materiales o el icono de papelera para borrarlos.")
 
     # TABLA EDITABLE INTERACTIVA
     df_editado = st.data_editor(
@@ -534,10 +535,9 @@ elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
         }
     )
 
-    # Recalcular automáticamente los subtotales y métricas en base a lo que el usuario editó
+    # Recalcular automáticamente subtotales y métricas en base a lo editado
     df_editado["Subtotal c/IVA ($)"] = df_editado["A Comprar (Cerrado)"] * df_editado["P.U. c/IVA ($)"]
 
-    # Filtrar subtotales por categoría de manera dinámica
     costo_material_principal = df_editado[df_editado["Categoría"] == "Material Principal"]["Subtotal c/IVA ($)"].sum()
     costo_consumibles = df_editado[df_editado["Categoría"].isin(["Consumible", "Herramental", "Otro"])]["Subtotal c/IVA ($)"].sum()
     costo_total_general = df_editado["Subtotal c/IVA ($)"].sum()
