@@ -493,25 +493,20 @@ if menu_seleccionado == "📊 Producción y Registro":
 
 elif menu_seleccionado == "💰 Costeo y Materiales (Excel)":
     st.subheader(f"💰 Explosión de Materiales y Costeo de Compra — Ref: {oc_actual}")
-    st.caption("Calcula automáticamente los insumos a partir de la corrida estándar de 1,700 piezas. Puedes editar precios unitarios, cambiar cantidades o agregar/eliminar filas directamente en la tabla.")
+    st.caption(f"Cálculo automático de insumos basado en la Orden Activa **{oc_actual}** (Meta: **{meta_actual:,} pzas** a partir de la corrida estándar de 1,700 pzas). Puedes editar precios, cantidades o agregar filas libremente.")
 
     col_c1, col_c2 = st.columns([1, 1])
     with col_c1:
-        # AQUÍ ESTABLECEMOS LA META ACTUAL DE LA OC COMO VALOR POR DEFECTO
-        meta_costeo = st.number_input(
-            "Meta de Piezas a Cotizar / Producir:", 
-            min_value=1, 
-            value=meta_actual, 
-            step=50,
-            help="Carga automáticamente la meta de la Orden de Compra activa, pero puedes ajustarla para simulaciones."
-        )
+        # AQUÍ CAMBIAMOS EL INPUT NUMÉRICO POR UNA TARJETA/CAMPO DE SOLO LECTURA CON LA META FIJA DE LA OC
+        meta_costeo = meta_actual
+        st.metric(label="Meta de Piezas (Orden Activa)", value=f"{meta_costeo:,} pzas")
     with col_c2:
         proveedor_sel = st.selectbox(
             "Proveedor Principal de Acero (Semiflecha y Solera):", 
             ["ACEROMEX", "VENTACERO"]
         )
 
-    # Inicializar datos base proporcionales a la meta activa
+    # Inicializar datos base proporcionales a la meta de la OC activa
     df_base = calcular_requerimiento_materiales(meta_costeo, proveedor_sel)
 
     st.markdown("---")
